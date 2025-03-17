@@ -14,6 +14,7 @@ from transformers import AutoTokenizer
 import nltk
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
+import datetime
 
 # Download necessary NLTK resources
 nltk.download('punkt', quiet=True)
@@ -119,6 +120,58 @@ def create_caller_only_version(text):
     return ' '.join(caller_lines) if caller_lines else text
 
 
+def generate_synthetic_timestamps(df, text_column="text"):
+    """
+    Generate synthetic timestamps if they don't exist in the DataFrame.
+    
+    Args:
+        df (pd.DataFrame): Input dataframe with conversation texts
+        text_column (str): Column name containing conversation text
+        
+    Returns:
+        pd.DataFrame: DataFrame with added timestamps if they were missing
+    """
+    # Check if timestamp column exists
+    if "timestamp" not in df.columns:
+        print("No timestamp column found. Generating synthetic timestamps...")
+        
+        # Create a copy of the dataframe
+        df_with_timestamps = df.copy()
+        
+        # Set a base timestamp (e.g., today at 9 AM)
+        base_time = datetime.datetime.now().replace(
+            hour=9, minute=0, second=0, microsecond=0
+        )
+        
+        # Estimate average message length and time between messages
+        avg_chars_per_second = 10  # Adjust as needed
+        min_seconds_between_msgs = 10  # Minimum time between messages
+        
+        timestamps = []
+        current_time = base_time
+        
+        # Generate timestamps based on text length
+        for idx, row in df.iterrows():
+            text_length = len(str(row[text_column]))
+            
+            # Add current timestamp
+            timestamps.append(current_time.strftime("%Y-%m-%d %H:%M:%S"))
+            
+            # Calculate time for next message based on text length
+            time_to_add = max(
+                min_seconds_between_msgs,
+                int(text_length / avg_chars_per_second)
+            )
+            current_time += datetime.timedelta(seconds=time_to_add)
+        
+        # Add timestamps to dataframe
+        df_with_timestamps["timestamp"] = timestamps
+        return df_with_timestamps
+    
+    # Timestamps already exist
+    return df
+
+
 def load_and_preprocess_data(data_path=config.DATA_PATH, create_caller_only=True, df=None):
     """
     Load and preprocess the complaint dataset.
@@ -139,6 +192,9 @@ def load_and_preprocess_data(data_path=config.DATA_PATH, create_caller_only=True
     
     if config.TEXT_COLUMN not in df.columns or config.LABEL_COLUMN not in df.columns:
         raise ValueError(f"Dataset must contain '{config.TEXT_COLUMN}' and '{config.LABEL_COLUMN}' columns")
+    
+    # Generate synthetic timestamps if needed
+    df = generate_synthetic_timestamps(df, text_column=config.TEXT_COLUMN)
     
     # Clean text
     print("Cleaning text data...")

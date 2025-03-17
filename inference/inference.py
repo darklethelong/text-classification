@@ -20,14 +20,14 @@ from transformers import AutoTokenizer
 class ComplaintDetector:
     """Class for detecting complaints in conversations."""
     
-    def __init__(self, model_type=None, model_path=None, threshold=config.COMPLAINT_THRESHOLD):
+    def __init__(self, model_type=None, model_path=None, threshold=0.3):
         """
         Initialize complaint detector.
         
         Args:
             model_type (str, optional): Type of model to use
             model_path (str, optional): Path to model checkpoint
-            threshold (float): Threshold for complaint classification
+            threshold (float): Threshold for complaint classification (default: 0.3 for imbalanced data)
         """
         self.model_type = model_type
         self.model_path = model_path

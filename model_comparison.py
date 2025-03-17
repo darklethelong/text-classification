@@ -52,7 +52,11 @@ def train_model(model_type, train_dataloader, val_dataloader, device, output_dir
     
     # Setup optimizer and criterion
     optimizer = torch.optim.AdamW(model.parameters(), lr=config.LEARNING_RATE, weight_decay=config.WEIGHT_DECAY)
-    criterion = torch.nn.BCEWithLogitsLoss()
+    
+    # Calculate class weights for imbalanced data
+    # Use the weights from config, or calculate dynamically if needed
+    pos_weight = torch.tensor([config.CLASS_WEIGHTS[1] / config.CLASS_WEIGHTS[0]]).to(device)
+    criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     
     # Model path
     model_dir = os.path.join(output_dir, model_type)
@@ -206,6 +210,10 @@ def evaluate_model(model_type, model_path, test_dataloader, device):
     # Evaluation
     test_predictions = []
     test_labels = []
+    test_probs = []
+    
+    # Set a lower threshold for imbalanced data
+    threshold = 0.3  # Lower threshold to increase recall
     
     test_loop = tqdm(test_dataloader, desc=f"Evaluating {model_type}")
     with torch.no_grad():
@@ -223,11 +231,12 @@ def evaluate_model(model_type, model_path, test_dataloader, device):
             
             # Get predictions
             probs = torch.sigmoid(outputs)
-            predictions = (probs > 0.5).int()
+            predictions = (probs > threshold).int()  # Use lower threshold
             
             # Store results
             test_predictions.extend(predictions.cpu().numpy())
             test_labels.extend(labels.int().cpu().numpy())
+            test_probs.extend(probs.cpu().numpy())
     
     # Calculate metrics
     accuracy = accuracy_score(test_labels, test_predictions)
@@ -238,13 +247,26 @@ def evaluate_model(model_type, model_path, test_dataloader, device):
     # Confusion matrix
     cm = confusion_matrix(test_labels, test_predictions)
     
+    # Print detailed performance report
+    print(f"  Accuracy: {accuracy:.4f}")
+    print(f"  Precision: {precision:.4f}")
+    print(f"  Recall: {recall:.4f}")
+    print(f"  F1 Score: {f1:.4f}")
+    print(f"  Classification threshold: {threshold}")
+    
+    if cm.size > 1:  # Only print if we have a proper 2x2 matrix
+        tn, fp, fn, tp = cm.ravel()
+        print(f"  Confusion Matrix: TN={tn}, FP={fp}, FN={fn}, TP={tp}")
+    
     # Return metrics
     metrics = {
         "accuracy": accuracy,
         "precision": precision,
         "recall": recall,
         "f1": f1,
-        "confusion_matrix": cm
+        "confusion_matrix": cm,
+        "threshold": threshold,
+        "probabilities": test_probs
     }
     
     return metrics
@@ -265,6 +287,9 @@ def predict_with_model(model_type, model_path, df, tokenizer, device):
     model.load_state_dict(torch.load(model_path))
     model.eval()
     
+    # Use the same threshold as in evaluation
+    threshold = 0.3
+    
     # Create detector
     detector = ComplaintDetector(model_type=model_type, model_path=model_path)
     
@@ -278,14 +303,18 @@ def predict_with_model(model_type, model_path, df, tokenizer, device):
         # Make prediction
         is_complaint, prob, _ = detector.predict(text)
         
+        # Apply the lower threshold to raw probability
+        is_complaint_adjusted = prob >= threshold
+        
         # Store results
-        predictions.append(int(is_complaint))
+        predictions.append(int(is_complaint_adjusted))
         probabilities.append(float(prob))
     
     # Add predictions to dataframe
     df_copy = df.copy()
     df_copy["is_complaint"] = predictions
     df_copy["complaint_probability"] = probabilities
+    df_copy["threshold_used"] = threshold
     
     # Add intensity labels based on probability
     def get_intensity(prob):
