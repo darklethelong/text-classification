@@ -1,0 +1,181 @@
+full_text,caller_text,label
+"[09:19:30] Agent: Is there anything else I can help you with today?
+[09:19:45] Caller: No, that's all. Thank you for your help.
+[09:20:00] Agent: You're very welcome, Mr./Ms. Johnson. Thank you for calling customer service. Have a great day!
+[09:20:15] Caller: You too. Goodbye.","[09:19:45] No, that's all. Thank you for your help.
+[09:20:15] You too. Goodbye.",non-complaint
+"[14:31:15] Caller: It's Robert Davis.
+[14:31:30] Agent: Thank you, Mr./Ms. Davis. I can see your account here. Could you please verify your address?
+[14:31:45] Caller: 456 Maple Avenue, Apartment 7C.
+[14:32:00] Agent: Thank you for verifying your information. Now, regarding your internet speed issue, can you tell me when you first noticed the problem and what devices are affected?","[14:31:15] It's Robert Davis.
+[14:31:45] 456 Maple Avenue, Apartment 7C.",non-complaint
+"[14:31:30] Agent: Thank you, Mr./Ms. Davis. I can see your account here. Could you please verify your address?
+[14:31:45] Caller: 456 Maple Avenue, Apartment 7C.
+[14:32:00] Agent: Thank you for verifying your information. Now, regarding your internet speed issue, can you tell me when you first noticed the problem and what devices are affected?
+[14:32:15] Caller: It started about three days ago. It's affecting all our devices - my laptop, my wife's computer, our phones, and the smart TV. Everything is extremely slow.","[14:31:45] 456 Maple Avenue, Apartment 7C.
+[14:32:15] It started about three days ago. It's affecting all our devices - my laptop, my wife's computer, our phones, and the smart TV. Everything is extremely slow.",non-complaint
+"[14:30:45] Caller: It's 555-789-1234.
+[14:31:00] Agent: Thank you. And may I have your name for verification purposes?
+[14:31:15] Caller: It's Robert Davis.
+[14:31:30] Agent: Thank you, Mr./Ms. Davis. I can see your account here. Could you please verify your address?","[14:30:45] It's 555-789-1234.
+[14:31:15] It's Robert Davis.",non-complaint
+"[14:33:45] Caller: Tomorrow morning works for me. I'll make sure to be home during that time.
+[14:34:00] Agent: I understand this is urgent for you. Let me check if we have any emergency slots available today... I do see that we have an opening this afternoon between 3 PM and 5 PM if that would work better for you. Also, I'll apply a service credit to your account for the days you've experienced this issue.
+[14:34:15] Caller: That would be perfect, thank you. I really appreciate you finding a slot today.
+[14:34:30] Agent: Is there anything else I can help you with today?","[14:33:45] Tomorrow morning works for me. I'll make sure to be home during that time.
+[14:34:15] That would be perfect, thank you. I really appreciate you finding a slot today.",non-complaint
+"[09:15:15] Caller: I'm calling about a charge on my bill that I don't recognize. It's for $49.99 from last month.
+[09:15:30] Agent: I'd be happy to help you with that. First, may I have your account number or the phone number associated with your account?
+[09:15:45] Caller: It's 555-789-1234.
+[09:16:00] Agent: Thank you. And may I have your name for verification purposes?","[09:15:15] I'm calling about a charge on my bill that I don't recognize. It's for $49.99 from last month.
+[09:15:45] It's 555-789-1234.",non-complaint
+"[09:18:00] Agent: Thank you for your patience. I've reviewed your account, and it looks like there was an automatic upgrade applied to your account when you called last month about the service disruption. However, I can see that the representative didn't properly explain this change to you.
+[09:18:15] Caller: I never agreed to any upgrade! This is completely unacceptable. You can't just add charges to my account without my consent. I want this removed immediately and I want a refund.
+[09:18:30] Agent: I sincerely apologize for this misunderstanding. You're absolutely right that any upgrade should have been clearly explained and approved by you. I'm going to remove this charge from your account right away and make sure you're back on your original plan. It will be reflected in your next statement.
+[09:18:45] Caller: Thank you, I appreciate that. I'm glad we could get this sorted out.","[09:18:15] I never agreed to any upgrade! This is completely unacceptable. You can't just add charges to my account without my consent. I want this removed immediately and I want a refund.
+[09:18:45] Thank you, I appreciate that. I'm glad we could get this sorted out.",complaint
+"[09:16:30] Agent: Thank you, Mr./Ms. Johnson. I can see your account here. Could you please verify your address?
+[09:16:45] Caller: 456 Maple Avenue, Apartment 7C.
+[09:17:00] Agent: Thank you for verifying your information. Now, you mentioned you don't recognize a charge on your bill. Could you tell me the exact amount and the date it appeared?
+[09:17:15] Caller: It's a charge for $49.99 on April 15th. It says 'Premium Service Package', but I never signed up for that.","[09:16:45] 456 Maple Avenue, Apartment 7C.
+[09:17:15] It's a charge for $49.99 on April 15th. It says 'Premium Service Package', but I never signed up for that.",non-complaint
+"[09:15:30] Agent: I'd be happy to help you with that. First, may I have your account number or the phone number associated with your account?
+[09:15:45] Caller: It's 555-789-1234.
+[09:16:00] Agent: Thank you. And may I have your name for verification purposes?
+[09:16:15] Caller: It's Sarah Johnson.","[09:15:45] It's 555-789-1234.
+[09:16:15] It's Sarah Johnson.",non-complaint
+"[09:17:45] Caller: This is really frustrating. I've been charged for something I didn't ask for, and now I have to waste time getting it fixed. Your billing system should be more transparent.
+[09:18:00] Agent: Thank you for your patience. I've reviewed your account, and it looks like there was an automatic upgrade applied to your account when you called last month about the service disruption. However, I can see that the representative didn't properly explain this change to you.
+[09:18:15] Caller: I never agreed to any upgrade! This is completely unacceptable. You can't just add charges to my account without my consent. I want this removed immediately and I want a refund.
+[09:18:30] Agent: I sincerely apologize for this misunderstanding. You're absolutely right that any upgrade should have been clearly explained and approved by you. I'm going to remove this charge from your account right away and make sure you're back on your original plan. It will be reflected in your next statement.","[09:17:45] This is really frustrating. I've been charged for something I didn't ask for, and now I have to waste time getting it fixed. Your billing system should be more transparent.
+[09:18:15] I never agreed to any upgrade! This is completely unacceptable. You can't just add charges to my account without my consent. I want this removed immediately and I want a refund.",complaint
+"[09:15:00] Agent: Thank you for calling customer service. My name is David. How may I help you today?
+[09:15:15] Caller: I'm calling about a charge on my bill that I don't recognize. It's for $49.99 from last month.
+[09:15:30] Agent: I'd be happy to help you with that. First, may I have your account number or the phone number associated with your account?
+[09:15:45] Caller: It's 555-789-1234.","[09:15:15] I'm calling about a charge on my bill that I don't recognize. It's for $49.99 from last month.
+[09:15:45] It's 555-789-1234.",non-complaint
+"[14:32:00] Agent: Thank you for verifying your information. Now, regarding your internet speed issue, can you tell me when you first noticed the problem and what devices are affected?
+[14:32:15] Caller: It started about three days ago. It's affecting all our devices - my laptop, my wife's computer, our phones, and the smart TV. Everything is extremely slow.
+[14:32:30] Agent: I understand how frustrating slow internet can be. Let me run a diagnostic check on your connection to see what might be causing this issue. It will take just a moment.
+[14:32:45] Caller: I appreciate you checking. I hope we can get it resolved quickly.","[14:32:15] It started about three days ago. It's affecting all our devices - my laptop, my wife's computer, our phones, and the smart TV. Everything is extremely slow.
+[14:32:45] I appreciate you checking. I hope we can get it resolved quickly.",non-complaint
+"[14:33:00] Agent: Thank you for your patience. I've completed the diagnostic, and I can see there's an issue with the signal strength reaching your modem. There appears to be some interference or a potential problem with the line coming into your home.
+[14:33:15] Caller: I see. What should we do to fix that?
+[14:33:30] Agent: I understand your concern, and I want to get this resolved quickly for you. I can schedule a technician to visit your home tomorrow. We actually have availability between 10 AM and 12 PM. Would that work for you?
+[14:33:45] Caller: Tomorrow morning works for me. I'll make sure to be home during that time.","[14:33:15] I see. What should we do to fix that?
+[14:33:45] Tomorrow morning works for me. I'll make sure to be home during that time.",non-complaint
+"[14:30:00] Agent: Thank you for calling customer service. My name is David. How may I help you today?
+[14:30:15] Caller: My internet has been really slow for the past few days. Pages take forever to load and videos keep buffering.
+[14:30:30] Agent: I'd be happy to help you with that. First, may I have your account number or the phone number associated with your account?
+[14:30:45] Caller: It's 555-789-1234.","[14:30:15] My internet has been really slow for the past few days. Pages take forever to load and videos keep buffering.
+[14:30:45] It's 555-789-1234.",non-complaint
+"[09:19:15] Caller: Thank you, I appreciate that gesture. That seems fair.
+[09:19:30] Agent: Is there anything else I can help you with today?
+[09:19:45] Caller: No, that's all. Thank you for your help.
+[09:20:00] Agent: You're very welcome, Mr./Ms. Johnson. Thank you for calling customer service. Have a great day!","[09:19:15] Thank you, I appreciate that gesture. That seems fair.
+[09:19:45] No, that's all. Thank you for your help.",non-complaint
+"[09:16:45] Caller: 456 Maple Avenue, Apartment 7C.
+[09:17:00] Agent: Thank you for verifying your information. Now, you mentioned you don't recognize a charge on your bill. Could you tell me the exact amount and the date it appeared?
+[09:17:15] Caller: It's a charge for $49.99 on April 15th. It says 'Premium Service Package', but I never signed up for that.
+[09:17:30] Agent: I understand your concern. Let me look into that charge for you. It might take a moment while I check your account history.","[09:16:45] 456 Maple Avenue, Apartment 7C.
+[09:17:15] It's a charge for $49.99 on April 15th. It says 'Premium Service Package', but I never signed up for that.",non-complaint
+"[09:18:30] Agent: I sincerely apologize for this misunderstanding. You're absolutely right that any upgrade should have been clearly explained and approved by you. I'm going to remove this charge from your account right away and make sure you're back on your original plan. It will be reflected in your next statement.
+[09:18:45] Caller: Thank you, I appreciate that. I'm glad we could get this sorted out.
+[09:19:00] Agent: I completely understand your frustration, and you're right to be upset. As a goodwill gesture, I'd like to offer you a $20 credit on your next bill for the inconvenience this has caused you. I'm also making a note in your account to ensure this doesn't happen again.
+[09:19:15] Caller: Thank you, I appreciate that gesture. That seems fair.","[09:18:45] Thank you, I appreciate that. I'm glad we could get this sorted out.
+[09:19:15] Thank you, I appreciate that gesture. That seems fair.",non-complaint
+"[09:18:45] Caller: Thank you, I appreciate that. I'm glad we could get this sorted out.
+[09:19:00] Agent: I completely understand your frustration, and you're right to be upset. As a goodwill gesture, I'd like to offer you a $20 credit on your next bill for the inconvenience this has caused you. I'm also making a note in your account to ensure this doesn't happen again.
+[09:19:15] Caller: Thank you, I appreciate that gesture. That seems fair.
+[09:19:30] Agent: Is there anything else I can help you with today?","[09:18:45] Thank you, I appreciate that. I'm glad we could get this sorted out.
+[09:19:15] Thank you, I appreciate that gesture. That seems fair.",non-complaint
+"[09:15:45] Caller: It's 555-789-1234.
+[09:16:00] Agent: Thank you. And may I have your name for verification purposes?
+[09:16:15] Caller: It's Sarah Johnson.
+[09:16:30] Agent: Thank you, Mr./Ms. Johnson. I can see your account here. Could you please verify your address?","[09:15:45] It's 555-789-1234.
+[09:16:15] It's Sarah Johnson.",non-complaint
+"[09:19:00] Agent: I completely understand your frustration, and you're right to be upset. As a goodwill gesture, I'd like to offer you a $20 credit on your next bill for the inconvenience this has caused you. I'm also making a note in your account to ensure this doesn't happen again.
+[09:19:15] Caller: Thank you, I appreciate that gesture. That seems fair.
+[09:19:30] Agent: Is there anything else I can help you with today?
+[09:19:45] Caller: No, that's all. Thank you for your help.","[09:19:15] Thank you, I appreciate that gesture. That seems fair.
+[09:19:45] No, that's all. Thank you for your help.",non-complaint
+"[14:32:45] Caller: I appreciate you checking. I hope we can get it resolved quickly.
+[14:33:00] Agent: Thank you for your patience. I've completed the diagnostic, and I can see there's an issue with the signal strength reaching your modem. There appears to be some interference or a potential problem with the line coming into your home.
+[14:33:15] Caller: I see. What should we do to fix that?
+[14:33:30] Agent: I understand your concern, and I want to get this resolved quickly for you. I can schedule a technician to visit your home tomorrow. We actually have availability between 10 AM and 12 PM. Would that work for you?","[14:32:45] I appreciate you checking. I hope we can get it resolved quickly.
+[14:33:15] I see. What should we do to fix that?",non-complaint
+"[14:31:45] Caller: 456 Maple Avenue, Apartment 7C.
+[14:32:00] Agent: Thank you for verifying your information. Now, regarding your internet speed issue, can you tell me when you first noticed the problem and what devices are affected?
+[14:32:15] Caller: It started about three days ago. It's affecting all our devices - my laptop, my wife's computer, our phones, and the smart TV. Everything is extremely slow.
+[14:32:30] Agent: I understand how frustrating slow internet can be. Let me run a diagnostic check on your connection to see what might be causing this issue. It will take just a moment.","[14:31:45] 456 Maple Avenue, Apartment 7C.
+[14:32:15] It started about three days ago. It's affecting all our devices - my laptop, my wife's computer, our phones, and the smart TV. Everything is extremely slow.",non-complaint
+"[09:17:00] Agent: Thank you for verifying your information. Now, you mentioned you don't recognize a charge on your bill. Could you tell me the exact amount and the date it appeared?
+[09:17:15] Caller: It's a charge for $49.99 on April 15th. It says 'Premium Service Package', but I never signed up for that.
+[09:17:30] Agent: I understand your concern. Let me look into that charge for you. It might take a moment while I check your account history.
+[09:17:45] Caller: This is really frustrating. I've been charged for something I didn't ask for, and now I have to waste time getting it fixed. Your billing system should be more transparent.","[09:17:15] It's a charge for $49.99 on April 15th. It says 'Premium Service Package', but I never signed up for that.
+[09:17:45] This is really frustrating. I've been charged for something I didn't ask for, and now I have to waste time getting it fixed. Your billing system should be more transparent.",complaint
+"[14:32:30] Agent: I understand how frustrating slow internet can be. Let me run a diagnostic check on your connection to see what might be causing this issue. It will take just a moment.
+[14:32:45] Caller: I appreciate you checking. I hope we can get it resolved quickly.
+[14:33:00] Agent: Thank you for your patience. I've completed the diagnostic, and I can see there's an issue with the signal strength reaching your modem. There appears to be some interference or a potential problem with the line coming into your home.
+[14:33:15] Caller: I see. What should we do to fix that?","[14:32:45] I appreciate you checking. I hope we can get it resolved quickly.
+[14:33:15] I see. What should we do to fix that?",non-complaint
+"[14:32:15] Caller: It started about three days ago. It's affecting all our devices - my laptop, my wife's computer, our phones, and the smart TV. Everything is extremely slow.
+[14:32:30] Agent: I understand how frustrating slow internet can be. Let me run a diagnostic check on your connection to see what might be causing this issue. It will take just a moment.
+[14:32:45] Caller: I appreciate you checking. I hope we can get it resolved quickly.
+[14:33:00] Agent: Thank you for your patience. I've completed the diagnostic, and I can see there's an issue with the signal strength reaching your modem. There appears to be some interference or a potential problem with the line coming into your home.","[14:32:15] It started about three days ago. It's affecting all our devices - my laptop, my wife's computer, our phones, and the smart TV. Everything is extremely slow.
+[14:32:45] I appreciate you checking. I hope we can get it resolved quickly.",non-complaint
+"[09:18:15] Caller: I never agreed to any upgrade! This is completely unacceptable. You can't just add charges to my account without my consent. I want this removed immediately and I want a refund.
+[09:18:30] Agent: I sincerely apologize for this misunderstanding. You're absolutely right that any upgrade should have been clearly explained and approved by you. I'm going to remove this charge from your account right away and make sure you're back on your original plan. It will be reflected in your next statement.
+[09:18:45] Caller: Thank you, I appreciate that. I'm glad we could get this sorted out.
+[09:19:00] Agent: I completely understand your frustration, and you're right to be upset. As a goodwill gesture, I'd like to offer you a $20 credit on your next bill for the inconvenience this has caused you. I'm also making a note in your account to ensure this doesn't happen again.","[09:18:15] I never agreed to any upgrade! This is completely unacceptable. You can't just add charges to my account without my consent. I want this removed immediately and I want a refund.
+[09:18:45] Thank you, I appreciate that. I'm glad we could get this sorted out.",complaint
+"[09:16:15] Caller: It's Sarah Johnson.
+[09:16:30] Agent: Thank you, Mr./Ms. Johnson. I can see your account here. Could you please verify your address?
+[09:16:45] Caller: 456 Maple Avenue, Apartment 7C.
+[09:17:00] Agent: Thank you for verifying your information. Now, you mentioned you don't recognize a charge on your bill. Could you tell me the exact amount and the date it appeared?","[09:16:15] It's Sarah Johnson.
+[09:16:45] 456 Maple Avenue, Apartment 7C.",non-complaint
+"[14:33:15] Caller: I see. What should we do to fix that?
+[14:33:30] Agent: I understand your concern, and I want to get this resolved quickly for you. I can schedule a technician to visit your home tomorrow. We actually have availability between 10 AM and 12 PM. Would that work for you?
+[14:33:45] Caller: Tomorrow morning works for me. I'll make sure to be home during that time.
+[14:34:00] Agent: I understand this is urgent for you. Let me check if we have any emergency slots available today... I do see that we have an opening this afternoon between 3 PM and 5 PM if that would work better for you. Also, I'll apply a service credit to your account for the days you've experienced this issue.","[14:33:15] I see. What should we do to fix that?
+[14:33:45] Tomorrow morning works for me. I'll make sure to be home during that time.",non-complaint
+"[09:17:15] Caller: It's a charge for $49.99 on April 15th. It says 'Premium Service Package', but I never signed up for that.
+[09:17:30] Agent: I understand your concern. Let me look into that charge for you. It might take a moment while I check your account history.
+[09:17:45] Caller: This is really frustrating. I've been charged for something I didn't ask for, and now I have to waste time getting it fixed. Your billing system should be more transparent.
+[09:18:00] Agent: Thank you for your patience. I've reviewed your account, and it looks like there was an automatic upgrade applied to your account when you called last month about the service disruption. However, I can see that the representative didn't properly explain this change to you.","[09:17:15] It's a charge for $49.99 on April 15th. It says 'Premium Service Package', but I never signed up for that.
+[09:17:45] This is really frustrating. I've been charged for something I didn't ask for, and now I have to waste time getting it fixed. Your billing system should be more transparent.",complaint
+"[14:30:15] Caller: My internet has been really slow for the past few days. Pages take forever to load and videos keep buffering.
+[14:30:30] Agent: I'd be happy to help you with that. First, may I have your account number or the phone number associated with your account?
+[14:30:45] Caller: It's 555-789-1234.
+[14:31:00] Agent: Thank you. And may I have your name for verification purposes?","[14:30:15] My internet has been really slow for the past few days. Pages take forever to load and videos keep buffering.
+[14:30:45] It's 555-789-1234.",non-complaint
+"[14:30:30] Agent: I'd be happy to help you with that. First, may I have your account number or the phone number associated with your account?
+[14:30:45] Caller: It's 555-789-1234.
+[14:31:00] Agent: Thank you. And may I have your name for verification purposes?
+[14:31:15] Caller: It's Robert Davis.","[14:30:45] It's 555-789-1234.
+[14:31:15] It's Robert Davis.",non-complaint
+"[09:17:30] Agent: I understand your concern. Let me look into that charge for you. It might take a moment while I check your account history.
+[09:17:45] Caller: This is really frustrating. I've been charged for something I didn't ask for, and now I have to waste time getting it fixed. Your billing system should be more transparent.
+[09:18:00] Agent: Thank you for your patience. I've reviewed your account, and it looks like there was an automatic upgrade applied to your account when you called last month about the service disruption. However, I can see that the representative didn't properly explain this change to you.
+[09:18:15] Caller: I never agreed to any upgrade! This is completely unacceptable. You can't just add charges to my account without my consent. I want this removed immediately and I want a refund.","[09:17:45] This is really frustrating. I've been charged for something I didn't ask for, and now I have to waste time getting it fixed. Your billing system should be more transparent.
+[09:18:15] I never agreed to any upgrade! This is completely unacceptable. You can't just add charges to my account without my consent. I want this removed immediately and I want a refund.",complaint
+"[14:33:30] Agent: I understand your concern, and I want to get this resolved quickly for you. I can schedule a technician to visit your home tomorrow. We actually have availability between 10 AM and 12 PM. Would that work for you?
+[14:33:45] Caller: Tomorrow morning works for me. I'll make sure to be home during that time.
+[14:34:00] Agent: I understand this is urgent for you. Let me check if we have any emergency slots available today... I do see that we have an opening this afternoon between 3 PM and 5 PM if that would work better for you. Also, I'll apply a service credit to your account for the days you've experienced this issue.
+[14:34:15] Caller: That would be perfect, thank you. I really appreciate you finding a slot today.","[14:33:45] Tomorrow morning works for me. I'll make sure to be home during that time.
+[14:34:15] That would be perfect, thank you. I really appreciate you finding a slot today.",non-complaint
+"[14:31:00] Agent: Thank you. And may I have your name for verification purposes?
+[14:31:15] Caller: It's Robert Davis.
+[14:31:30] Agent: Thank you, Mr./Ms. Davis. I can see your account here. Could you please verify your address?
+[14:31:45] Caller: 456 Maple Avenue, Apartment 7C.","[14:31:15] It's Robert Davis.
+[14:31:45] 456 Maple Avenue, Apartment 7C.",non-complaint
+"[14:34:00] Agent: I understand this is urgent for you. Let me check if we have any emergency slots available today... I do see that we have an opening this afternoon between 3 PM and 5 PM if that would work better for you. Also, I'll apply a service credit to your account for the days you've experienced this issue.
+[14:34:15] Caller: That would be perfect, thank you. I really appreciate you finding a slot today.
+[14:34:30] Agent: Is there anything else I can help you with today?
+[14:34:45] Caller: No, that's all. Thank you for your help.","[14:34:15] That would be perfect, thank you. I really appreciate you finding a slot today.
+[14:34:45] No, that's all. Thank you for your help.",non-complaint
+"[09:16:00] Agent: Thank you. And may I have your name for verification purposes?
+[09:16:15] Caller: It's Sarah Johnson.
+[09:16:30] Agent: Thank you, Mr./Ms. Johnson. I can see your account here. Could you please verify your address?
+[09:16:45] Caller: 456 Maple Avenue, Apartment 7C.","[09:16:15] It's Sarah Johnson.
+[09:16:45] 456 Maple Avenue, Apartment 7C.",non-complaint
