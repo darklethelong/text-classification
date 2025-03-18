@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Complaint Detection API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .card {
+            flex: 1;
+            min-width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            color: #3498db;
+            margin-top: 0;
+        }
+        .card p {
+            color: #666;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #3498db;
+            color: white;
+            text-decoration: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            transition: background-color 0.3s ease;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        pre {
+            background-color: #f8f9fa;
+            border-radius: 5px;
+            padding: 15px;
+            overflow-x: auto;
+        }
+        code {
+            font-family: 'Courier New', Courier, monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>Customer Complaint Detection API</h1>
+    <p>
+        Welcome to the Customer Complaint Detection API. This service provides real-time
+        complaint detection and visualization capabilities for customer conversations.
+    </p>
+
+    <div class="container">
+        <div class="card">
+            <h2>API Documentation</h2>
+            <p>
+                Explore the comprehensive API documentation to understand 
+                all available endpoints and features.
+            </p>
+            <a href="/docs" class="btn">View Documentation</a>
+        </div>
+
+        <div class="card">
+            <h2>Web Client</h2>
+            <p>
+                Use our interactive web client to analyze texts, process batches,
+                and perform real-time analysis with visualizations.
+            </p>
+            <a href="/templates/index.html" class="btn">Open Web Client</a>
+        </div>
+        
+        <div class="card">
+            <h2>Quick Example</h2>
+            <p>Here's a simple example of how to use the API:</p>
+            <pre><code>import requests
+
+# Single text analysis
+response = requests.post(
+    "http://localhost:8000/predict",
+    json={"text": "I've been waiting for hours and no one has helped me!"}
+)
+result = response.json()
+print(f"Is complaint: {result['is_complaint']}")
+print(f"Probability: {result['complaint_probability']}")
+</code></pre>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2>Real-time Processing</h2>
+            <p>
+                The API supports real-time processing of conversations with 
+                chunking (process after every 4 consecutive inputs by default).
+            </p>
+            <pre><code>import websocket
+import json
+
+# Connect to a session
+ws = websocket.WebSocket()
+ws.connect(f"ws://localhost:8000/ws/{session_id}")
+
+# Send a message
+ws.send(json.dumps({"text": "This is a test message"}))
+
+# Receive a response
+result = json.loads(ws.recv())
+print(result)
+</code></pre>
+        </div>
+
+        <div class="card">
+            <h2>Visualizations</h2>
+            <p>
+                The API provides several visualization types to help analyze
+                complaint patterns and distribution.
+            </p>
+            <ul>
+                <li>Complaint Timeline</li>
+                <li>Complaint Percentage Gauge</li>
+                <li>Complaint Heatmap</li>
+                <li>Probability Distribution</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html> 
