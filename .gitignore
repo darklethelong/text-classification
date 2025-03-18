@@ -64,4 +64,9 @@ models/test/
 .Spotlight-V100
 .Trashes
 ehthumbs.db
-Thumbs.db 
+Thumbs.db
+
+# Project specific
+/__init__.py
+/sample_data.csv
+/data/full_conversations.json 

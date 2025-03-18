@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from datetime import datetime
 import pickle
+import time
+import gc
 from tqdm import tqdm
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, confusion_matrix
 
@@ -187,6 +189,75 @@ def train_model(model_type, train_dataloader, val_dataloader, device, output_dir
     
     return model_path, history
 
+def count_parameters(model):
+    """Count the number of trainable parameters in a model."""
+    return sum(p.numel() for p in model.parameters() if p.requires_grad)
+
+def get_model_size_mb(model_path):
+    """Get the size of a model file in MB."""
+    size_bytes = os.path.getsize(model_path)
+    size_mb = size_bytes / (1024 * 1024)
+    return size_mb
+
+def measure_inference_latency(model, tokenizer, device, num_samples=100, max_length=512):
+    """
+    Measure the average inference latency of a model.
+    
+    Args:
+        model: PyTorch model
+        tokenizer: Tokenizer for encoding text
+        device: Device to run inference on
+        num_samples: Number of samples to test
+        max_length: Maximum sequence length
+        
+    Returns:
+        dict: Latency metrics in milliseconds
+    """
+    model.eval()
+    
+    # Generate dummy input of realistic length
+    text = "This is a sample text for measuring inference latency. " * 10
+    
+    # Process input
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_length, padding="max_length")
+    
+    # Remove token_type_ids if present as MLMComplaintDetector doesn't use it
+    if 'token_type_ids' in inputs:
+        del inputs['token_type_ids']
+    
+    # Move inputs to device
+    input_ids = inputs['input_ids'].to(device)
+    attention_mask = inputs['attention_mask'].to(device)
+    
+    # Warmup
+    for _ in range(10):
+        with torch.no_grad():
+            _ = model(input_ids, attention_mask)
+    
+    # Measure latency
+    latencies = []
+    with torch.no_grad():
+        for _ in range(num_samples):
+            start_time = time.time()
+            _ = model(input_ids, attention_mask)
+            end_time = time.time()
+            
+            latency = (end_time - start_time) * 1000  # Convert to ms
+            latencies.append(latency)
+    
+    # Calculate statistics
+    avg_latency = np.mean(latencies)
+    std_latency = np.std(latencies)
+    min_latency = np.min(latencies)
+    max_latency = np.max(latencies)
+    
+    return {
+        "avg_latency_ms": avg_latency,
+        "std_latency_ms": std_latency,
+        "min_latency_ms": min_latency,
+        "max_latency_ms": max_latency
+    }
+
 def evaluate_model(model_type, model_path, test_dataloader, device):
     """Evaluate a trained model on the test set."""
     # Load model
@@ -201,11 +272,29 @@ def evaluate_model(model_type, model_path, test_dataloader, device):
             "precision": 0.0,
             "recall": 0.0,
             "f1": 0.0,
-            "confusion_matrix": np.zeros((2, 2))
+            "confusion_matrix": np.zeros((2, 2)),
+            "model_size_mb": 0.0,
+            "param_count": 0,
+            "latency_metrics": {
+                "avg_latency_ms": 0.0,
+                "std_latency_ms": 0.0,
+                "min_latency_ms": 0.0,
+                "max_latency_ms": 0.0
+            }
         }
     
     model.load_state_dict(torch.load(model_path))
     model.eval()
+    
+    # Count parameters and get model size
+    param_count = count_parameters(model)
+    model_size_mb = get_model_size_mb(model_path)
+    
+    # Get tokenizer for latency measurement
+    tokenizer = get_tokenizer(model_type)
+    
+    # Measure inference latency
+    latency_metrics = measure_inference_latency(model, tokenizer, device)
     
     # Evaluation
     test_predictions = []
@@ -258,6 +347,11 @@ def evaluate_model(model_type, model_path, test_dataloader, device):
         tn, fp, fn, tp = cm.ravel()
         print(f"  Confusion Matrix: TN={tn}, FP={fp}, FN={fn}, TP={tp}")
     
+    # Print model size and latency information
+    print(f"  Model Size: {model_size_mb:.2f} MB")
+    print(f"  Parameter Count: {param_count:,}")
+    print(f"  Avg. Inference Latency: {latency_metrics['avg_latency_ms']:.2f} ms")
+    
     # Return metrics
     metrics = {
         "accuracy": accuracy,
@@ -266,7 +360,10 @@ def evaluate_model(model_type, model_path, test_dataloader, device):
         "f1": f1,
         "confusion_matrix": cm,
         "threshold": threshold,
-        "probabilities": test_probs
+        "probabilities": test_probs,
+        "model_size_mb": model_size_mb,
+        "param_count": param_count,
+        "latency_metrics": latency_metrics
     }
     
     return metrics
@@ -384,34 +481,65 @@ def plot_training_histories(histories, output_path):
     return fig
 
 def plot_comparison_bar(metrics_dict, output_path):
-    """Plot bar chart comparing model performance metrics."""
-    # Create dataframe for plotting
-    models = list(metrics_dict.keys())
-    metrics = ["accuracy", "precision", "recall", "f1"]
-    df_data = []
+    """Plot bar chart comparing model metrics."""
+    # Extract metrics
+    model_types = list(metrics_dict.keys())
+    f1_scores = [metrics_dict[model_type]["f1"] for model_type in model_types]
+    precision_scores = [metrics_dict[model_type]["precision"] for model_type in model_types]
+    recall_scores = [metrics_dict[model_type]["recall"] for model_type in model_types]
     
-    for model in models:
-        for metric in metrics:
-            df_data.append({
-                "Model": model,
-                "Metric": metric.capitalize(),
-                "Value": metrics_dict[model][metric]
-            })
+    # Shorten model names for plotting
+    short_names = [model_type.replace("_", "\n") for model_type in model_types]
     
-    df_plot = pd.DataFrame(df_data)
-    
-    # Create plot
+    # Create figure
     plt.figure(figsize=(12, 8))
-    sns.barplot(x="Model", y="Value", hue="Metric", data=df_plot)
+    
+    # Plot metrics
+    x = np.arange(len(model_types))
+    width = 0.25
+    
+    plt.bar(x - width, f1_scores, width, label="F1 Score", color="blue")
+    plt.bar(x, precision_scores, width, label="Precision", color="green")
+    plt.bar(x + width, recall_scores, width, label="Recall", color="orange")
+    
+    # Add labels and legend
+    plt.xlabel("Model Type")
+    plt.ylabel("Score")
     plt.title("Model Performance Comparison")
-    plt.ylim(0, 1)
-    plt.xticks(rotation=45)
-    plt.grid(True, alpha=0.3)
+    plt.xticks(x, short_names)
+    plt.ylim(0, 1.1)
+    plt.legend()
+    
     plt.tight_layout()
-    plt.savefig(output_path)
+    plt.savefig(output_path, dpi=300)
     plt.close()
     
-    return plt.gcf()
+    # Create model size and latency comparison
+    plt.figure(figsize=(12, 8))
+    
+    # Create subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 6))
+    
+    # Plot model sizes
+    model_sizes = [metrics_dict[model_type]["model_size_mb"] for model_type in model_types]
+    ax1.bar(short_names, model_sizes, color="purple")
+    ax1.set_title("Model Size Comparison")
+    ax1.set_ylabel("Size (MB)")
+    ax1.set_xlabel("Model Type")
+    ax1.tick_params(axis='x', rotation=45)
+    
+    # Plot inference latencies
+    latencies = [metrics_dict[model_type]["latency_metrics"]["avg_latency_ms"] for model_type in model_types]
+    ax2.bar(short_names, latencies, color="crimson")
+    ax2.set_title("Inference Latency Comparison")
+    ax2.set_ylabel("Latency (ms)")
+    ax2.set_xlabel("Model Type")
+    ax2.tick_params(axis='x', rotation=45)
+    
+    plt.tight_layout()
+    size_latency_path = os.path.splitext(output_path)[0] + "_size_latency.png"
+    plt.savefig(size_latency_path, dpi=300)
+    plt.close()
 
 def plot_confusion_matrices(metrics_dict, output_path):
     """Plot confusion matrices for all models."""
@@ -455,328 +583,325 @@ def plot_confusion_matrices(metrics_dict, output_path):
     return fig
 
 def generate_comparison_report(metrics_dict, histories, prediction_dfs, output_dir):
-    """Generate HTML report comparing model performance."""
-    # Create output directory for report
+    """Generate HTML report of model comparison results."""
+    # Create report directory
     report_dir = os.path.join(output_dir, "report")
     os.makedirs(report_dir, exist_ok=True)
     
-    # Generate plots
-    history_plot_path = os.path.join(report_dir, "training_histories.png")
-    plot_training_histories(histories, history_plot_path)
+    # Generate comparison charts
+    metrics_path = os.path.join(report_dir, "metrics_comparison.png")
+    plot_comparison_bar(metrics_dict, metrics_path)
     
-    comparison_plot_path = os.path.join(report_dir, "model_comparison.png")
-    plot_comparison_bar(metrics_dict, comparison_plot_path)
+    cm_path = os.path.join(report_dir, "confusion_matrices.png")
+    plot_confusion_matrices(metrics_dict, cm_path)
     
-    cm_plot_path = os.path.join(report_dir, "confusion_matrices.png")
-    plot_confusion_matrices(metrics_dict, cm_plot_path)
-    
-    # Find best model
-    best_model = max(metrics_dict.items(), key=lambda x: x[1]["f1"])
-    best_model_name = best_model[0]
-    best_model_f1 = best_model[1]["f1"]
-    
-    # Generate predictions visualizations for best model
-    best_model_vis_dir = os.path.join(report_dir, "best_model_vis")
-    os.makedirs(best_model_vis_dir, exist_ok=True)
-    
-    generate_dashboard(
-        prediction_dfs[best_model_name],
-        best_model_vis_dir,
-        timestamp_column=None,
-        text_column="text"
-    )
+    histories_path = os.path.join(report_dir, "training_histories.png")
+    plot_training_histories(histories, histories_path)
     
     # Generate HTML report
-    html_path = os.path.join(output_dir, "model_comparison_report.html")
+    report_path = os.path.join(report_dir, "model_comparison_report.html")
     
-    # Create model metrics table HTML
-    metrics_table_html = """
-    <table>
-        <tr>
-            <th>Model</th>
-            <th>Accuracy</th>
-            <th>Precision</th>
-            <th>Recall</th>
-            <th>F1 Score</th>
-        </tr>
-    """
-    
-    for model, metrics in metrics_dict.items():
-        # Highlight best model
-        row_style = ' style="background-color: #e6ffe6;"' if model == best_model_name else ""
-        
-        metrics_table_html += f"""
-        <tr{row_style}>
-            <td>{model}</td>
-            <td>{metrics['accuracy']:.4f}</td>
-            <td>{metrics['precision']:.4f}</td>
-            <td>{metrics['recall']:.4f}</td>
-            <td>{metrics['f1']:.4f}</td>
-        </tr>
-        """
-    
-    metrics_table_html += "</table>"
-    
-    # Write HTML report
+    # Create HTML content
     html_content = f"""
     <!DOCTYPE html>
     <html>
     <head>
         <title>Model Comparison Report</title>
         <style>
-            body {{ font-family: Arial, sans-serif; margin: 20px; }}
-            .header {{ background-color: #1a468e; color: white; padding: 20px; text-align: center; }}
-            .section {{ margin: 20px 0; padding: 15px; border: 1px solid #ddd; }}
-            img {{ max-width: 100%; }}
-            table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
-            th, td {{ text-align: left; padding: 8px; border-bottom: 1px solid #ddd; }}
-            th {{ background-color: #f2f2f2; }}
-            tr:hover {{ background-color: #f5f5f5; }}
-            .highlight {{ color: #d9534f; font-weight: bold; }}
-            .best-model {{ background-color: #dff0d8; font-weight: bold; }}
+            body {{
+                font-family: Arial, sans-serif;
+                margin: 20px;
+                line-height: 1.6;
+            }}
+            h1, h2, h3 {{
+                color: #333;
+            }}
+            .container {{
+                max-width: 1200px;
+                margin: 0 auto;
+            }}
+            table {{
+                border-collapse: collapse;
+                width: 100%;
+                margin-bottom: 20px;
+            }}
+            th, td {{
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }}
+            th {{
+                background-color: #f2f2f2;
+            }}
+            tr:nth-child(even) {{
+                background-color: #f9f9f9;
+            }}
+            .chart {{
+                max-width: 100%;
+                margin: 20px 0;
+            }}
+            .highlight {{
+                font-weight: bold;
+                color: #2e8b57;
+            }}
         </style>
     </head>
     <body>
-        <div class="header">
+        <div class="container">
             <h1>Model Comparison Report</h1>
-            <p>Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
-        </div>
+            <p>Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            
+            <h2>Performance Metrics</h2>
+            <table>
+                <tr>
+                    <th>Model</th>
+                    <th>F1 Score</th>
+                    <th>Precision</th>
+                    <th>Recall</th>
+                    <th>Accuracy</th>
+                    <th>Model Size (MB)</th>
+                    <th>Parameters</th>
+                    <th>Inference Latency (ms)</th>
+                </tr>
+    """
+    
+    # Find best model by F1 score
+    best_model = max(metrics_dict.keys(), key=lambda model: metrics_dict[model]["f1"])
+    
+    # Add rows for each model
+    for model_type, metrics in metrics_dict.items():
+        is_best = model_type == best_model
+        f1 = metrics["f1"]
+        precision = metrics["precision"]
+        recall = metrics["recall"]
+        accuracy = metrics["accuracy"]
+        model_size = metrics["model_size_mb"]
+        param_count = metrics["param_count"]
+        latency = metrics["latency_metrics"]["avg_latency_ms"]
         
-        <div class="section">
-            <h2>Summary</h2>
-            <p>
-                This report compares the performance of {len(metrics_dict)} different model architectures for complaint detection.
-                The best performing model was <span class="highlight">{best_model_name}</span> with an F1 score of <span class="highlight">{best_model_f1:.4f}</span>.
-            </p>
-        </div>
-        
-        <div class="section">
-            <h2>Model Performance Metrics</h2>
-            {metrics_table_html}
-        </div>
-        
-        <div class="section">
-            <h2>Performance Comparison</h2>
-            <img src="report/model_comparison.png" alt="Model Performance Comparison">
-        </div>
-        
-        <div class="section">
+        row_class = "highlight" if is_best else ""
+        html_content += f"""
+                <tr class="{row_class}">
+                    <td>{model_type}</td>
+                    <td>{f1:.4f}</td>
+                    <td>{precision:.4f}</td>
+                    <td>{recall:.4f}</td>
+                    <td>{accuracy:.4f}</td>
+                    <td>{model_size:.2f}</td>
+                    <td>{param_count:,}</td>
+                    <td>{latency:.2f}</td>
+                </tr>
+        """
+    
+    html_content += """
+            </table>
+            
+            <h2>Performance Comparison Charts</h2>
+            <div class="chart">
+                <img src="metrics_comparison.png" alt="Metrics Comparison" style="width: 100%;">
+            </div>
+            
+            <h2>Model Size and Latency Comparison</h2>
+            <div class="chart">
+                <img src="metrics_comparison_size_latency.png" alt="Size and Latency Comparison" style="width: 100%;">
+            </div>
+            
             <h2>Confusion Matrices</h2>
-            <img src="report/confusion_matrices.png" alt="Confusion Matrices">
-        </div>
-        
-        <div class="section">
-            <h2>Training History</h2>
-            <img src="report/training_histories.png" alt="Training Histories">
-        </div>
-        
-        <div class="section">
-            <h2>Best Model Visualizations</h2>
-            <p>The following visualizations show the performance of the best model ({best_model_name}) on the test set:</p>
-            <div>
-                <img src="report/best_model_vis/complaint_gauge.png" alt="Complaint Percentage Gauge">
-                <img src="report/best_model_vis/complaint_distribution.png" alt="Complaint Distribution">
+            <div class="chart">
+                <img src="confusion_matrices.png" alt="Confusion Matrices" style="width: 100%;">
             </div>
-            <div>
-                <img src="report/best_model_vis/complaint_timeline.png" alt="Complaint Timeline">
-                <img src="report/best_model_vis/complaint_heatmap.png" alt="Complaint Heatmap">
+            
+            <h2>Training Histories</h2>
+            <div class="chart">
+                <img src="training_histories.png" alt="Training Histories" style="width: 100%;">
             </div>
+            
+            <h2>Best Model</h2>
+    """
+    
+    # Add best model details
+    best_metrics = metrics_dict[best_model]
+    html_content += f"""
+            <p>The best performing model is <strong>{best_model}</strong> with an F1 score of {best_metrics["f1"]:.4f}.</p>
+            <h3>Model Details</h3>
+            <ul>
+                <li><strong>F1 Score:</strong> {best_metrics["f1"]:.4f}</li>
+                <li><strong>Precision:</strong> {best_metrics["precision"]:.4f}</li>
+                <li><strong>Recall:</strong> {best_metrics["recall"]:.4f}</li>
+                <li><strong>Accuracy:</strong> {best_metrics["accuracy"]:.4f}</li>
+                <li><strong>Model Size:</strong> {best_metrics["model_size_mb"]:.2f} MB</li>
+                <li><strong>Parameter Count:</strong> {best_metrics["param_count"]:,}</li>
+                <li><strong>Average Inference Latency:</strong> {best_metrics["latency_metrics"]["avg_latency_ms"]:.2f} ms</li>
+                <li><strong>Latency Standard Deviation:</strong> {best_metrics["latency_metrics"]["std_latency_ms"]:.2f} ms</li>
+                <li><strong>Min Latency:</strong> {best_metrics["latency_metrics"]["min_latency_ms"]:.2f} ms</li>
+                <li><strong>Max Latency:</strong> {best_metrics["latency_metrics"]["max_latency_ms"]:.2f} ms</li>
+            </ul>
+            
+            <h3>Model Selection Considerations</h3>
+            <p>
+                When selecting a model for deployment, consider the trade-offs between accuracy metrics, 
+                model size, and inference latency. For applications with strict latency requirements, 
+                a smaller model with slightly lower performance might be preferable.
+            </p>
+            
+            <h2>Detailed Model Analysis</h2>
+    """
+    
+    # Add section for each model
+    for model_type, metrics in metrics_dict.items():
+        # Calculate TN, FP, FN, TP from confusion matrix
+        if metrics["confusion_matrix"].size > 1:  # Only if we have a proper 2x2 matrix
+            tn, fp, fn, tp = metrics["confusion_matrix"].ravel()
+        else:
+            tn, fp, fn, tp = 0, 0, 0, 0
+        
+        html_content += f"""
+            <h3>{model_type}</h3>
+            <h4>Performance Metrics</h4>
+            <ul>
+                <li><strong>F1 Score:</strong> {metrics["f1"]:.4f}</li>
+                <li><strong>Precision:</strong> {metrics["precision"]:.4f}</li>
+                <li><strong>Recall:</strong> {metrics["recall"]:.4f}</li>
+                <li><strong>Accuracy:</strong> {metrics["accuracy"]:.4f}</li>
+            </ul>
+            
+            <h4>Model Efficiency</h4>
+            <ul>
+                <li><strong>Model Size:</strong> {metrics["model_size_mb"]:.2f} MB</li>
+                <li><strong>Parameter Count:</strong> {metrics["param_count"]:,}</li>
+                <li><strong>Average Inference Latency:</strong> {metrics["latency_metrics"]["avg_latency_ms"]:.2f} ms</li>
+            </ul>
+            
+            <h4>Confusion Matrix</h4>
+            <table>
+                <tr>
+                    <th></th>
+                    <th>Predicted Negative</th>
+                    <th>Predicted Positive</th>
+                </tr>
+                <tr>
+                    <th>Actual Negative</th>
+                    <td>TN: {tn}</td>
+                    <td>FP: {fp}</td>
+                </tr>
+                <tr>
+                    <th>Actual Positive</th>
+                    <td>FN: {fn}</td>
+                    <td>TP: {tp}</td>
+                </tr>
+            </table>
+        """
+    
+    html_content += """
         </div>
     </body>
     </html>
     """
     
-    with open(html_path, "w", encoding="utf-8") as f:
+    # Write HTML to file
+    with open(report_path, "w") as f:
         f.write(html_content)
     
-    print(f"Comparison report generated at {html_path}")
-    
-    return html_path
+    print(f"Model comparison report generated at {report_path}")
 
 def main():
-    """Main function to run training and comparison."""
+    """Main function for model training and comparison."""
+    # Parse command line arguments
     args = parse_args()
-    
-    # Create output directory
-    os.makedirs(args.output_dir, exist_ok=True)
     
     # Set device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
-    # Save all model types for consistent handling
-    all_model_types = ["mlm_full", "mlm_caller_only", "lstm_cnn_full", 
-                      "lstm_cnn_caller_only", "hybrid_full", "hybrid_caller_only"]
-    
-    # Filter to requested model types
-    model_types = [m for m in all_model_types if m in args.model_types]
-    print(f"Training and comparing the following models: {model_types}")
+    # Create output directory
+    os.makedirs(args.output_dir, exist_ok=True)
     
     # Load and preprocess data
     print("Loading and preprocessing data...")
-    df = pd.read_csv(args.data_path)
+    df = load_and_preprocess_data(args.data_path)
     
-    # Check if label column has text values (complaint/non-complaint) instead of 0/1
-    if df["label"].dtype == object:
-        # Convert to 0/1
-        df["label"] = df["label"].map({"non-complaint": 0, "complaint": 1})
-    
-    # Add "text" column if it doesn't exist (using full_text)
-    if "text" not in df.columns and "full_text" in df.columns:
-        df["text"] = df["full_text"]
-    
-    # Preprocess the data directly using the load_and_preprocess_data function
-    # Set the required columns in config temporarily
-    original_text_column = config.TEXT_COLUMN
-    config.TEXT_COLUMN = "text"
-    
-    # Process the data
-    processed_df = load_and_preprocess_data(data_path=None, create_caller_only=True, df=df)
-    
-    # Restore the original config
-    config.TEXT_COLUMN = original_text_column
-    
-    # Use the processed dataframe
-    df = processed_df
-    
-    # Save a copy of processed data
-    processed_data_path = os.path.join(args.output_dir, "processed_data.csv")
-    df.to_csv(processed_data_path, index=False)
-    
-    # Prepare data for training
-    # We'll need both full and caller-only versions
-    train_dataloaders = {}
-    val_dataloaders = {}
-    test_dataloaders = {}
+    # Prepare dataloaders for different model types
+    dataloaders = {}
     tokenizers = {}
-    
-    # Prepare data for full text models
-    train_dataloaders["full"], val_dataloaders["full"], test_dataloaders["full"], tokenizers["full"] = \
-        prepare_data_pipeline(use_caller_only=False, data_df=df, batch_size=args.batch_size)
-    
-    # Prepare data for caller-only models
-    train_dataloaders["caller_only"], val_dataloaders["caller_only"], test_dataloaders["caller_only"], tokenizers["caller_only"] = \
-        prepare_data_pipeline(use_caller_only=True, data_df=df, batch_size=args.batch_size)
-    
-    # Train all models
+    for model_type in args.model_types:
+        print(f"Preparing data for {model_type}...")
+        train_dataloader, val_dataloader, test_dataloader, tokenizer = prepare_data_pipeline(
+            df, 
+            model_type=model_type,
+            batch_size=args.batch_size
+        )
+        dataloaders[model_type] = (train_dataloader, val_dataloader, test_dataloader)
+        tokenizers[model_type] = tokenizer
+        
+    # Train and evaluate models
     model_paths = {}
     histories = {}
+    metrics_dict = {}
+    prediction_dfs = {}
     
-    for model_type in model_types:
+    for model_type in args.model_types:
         print(f"\n{'='*50}")
-        print(f"Training {model_type} model")
+        print(f"Processing {model_type} model...")
         print(f"{'='*50}")
         
-        # Select appropriate dataloader based on model type
-        dataloader_key = "caller_only" if "caller_only" in model_type else "full"
+        # Get dataloaders
+        train_dataloader, val_dataloader, test_dataloader = dataloaders[model_type]
         
         # Train model
         model_path, history = train_model(
-            model_type=model_type,
-            train_dataloader=train_dataloaders[dataloader_key],
-            val_dataloader=val_dataloaders[dataloader_key],
-            device=device,
-            output_dir=args.output_dir,
-            num_epochs=args.num_epochs
+            model_type, 
+            train_dataloader, 
+            val_dataloader, 
+            device, 
+            args.output_dir,
+            args.num_epochs
         )
         
+        # Store model path and history
         model_paths[model_type] = model_path
         histories[model_type] = history
-    
-    # Evaluate all models
-    print("\nEvaluating models on test set...")
-    metrics_dict = {}
-    
-    for model_type in model_types:
-        print(f"Evaluating {model_type}...")
-        
-        # Select appropriate dataloader based on model type
-        dataloader_key = "caller_only" if "caller_only" in model_type else "full"
         
         # Evaluate model
-        metrics = evaluate_model(
-            model_type=model_type,
-            model_path=model_paths[model_type],
-            test_dataloader=test_dataloaders[dataloader_key],
-            device=device
-        )
-        
+        print("\nEvaluating model...")
+        metrics = evaluate_model(model_type, model_path, test_dataloader, device)
         metrics_dict[model_type] = metrics
         
-        # Print metrics
-        print(f"  Accuracy: {metrics['accuracy']:.4f}")
-        print(f"  Precision: {metrics['precision']:.4f}")
-        print(f"  Recall: {metrics['recall']:.4f}")
-        print(f"  F1 Score: {metrics['f1']:.4f}")
-    
-    # Make predictions with all models
-    print("\nMaking predictions with all models...")
-    prediction_dfs = {}
-    
-    for model_type in model_types:
-        # Select appropriate tokenizer based on model type
-        tokenizer_key = "caller_only" if "caller_only" in model_type else "full"
+        # Make predictions on test set
+        print("\nMaking predictions on test set...")
+        test_df = predict_with_model(model_type, model_path, df, tokenizers[model_type], device)
+        prediction_dfs[model_type] = test_df
         
-        # Make predictions
-        predictions_df = predict_with_model(
-            model_type=model_type,
-            model_path=model_paths[model_type],
-            df=df,
-            tokenizer=tokenizers[tokenizer_key],
-            device=device
-        )
-        
-        # Save predictions
-        predictions_path = os.path.join(args.output_dir, f"{model_type}_predictions.csv")
-        predictions_df.to_csv(predictions_path, index=False)
-        
-        prediction_dfs[model_type] = predictions_df
+        # Clear GPU memory
+        torch.cuda.empty_cache()
+        gc.collect()
     
-    # Compare models
-    print("\nGenerating comparison visualizations...")
+    # Find best model by F1 score
+    best_model = max(metrics_dict.keys(), key=lambda model: metrics_dict[model]["f1"])
+    print(f"\nBest model by F1 score: {best_model} (F1: {metrics_dict[best_model]['f1']:.4f})")
     
-    # Plot training histories
-    history_plot_path = os.path.join(args.output_dir, "training_histories.png")
-    plot_training_histories(histories, history_plot_path)
+    # Print model size and latency comparison
+    print("\nModel Size and Latency Comparison:")
+    print(f"{'Model Type':<20} {'Size (MB)':<12} {'Parameters':<15} {'Avg Latency (ms)':<16}")
+    print("-" * 65)
+    for model_type in args.model_types:
+        metrics = metrics_dict[model_type]
+        print(f"{model_type:<20} {metrics['model_size_mb']:<12.2f} {metrics['param_count']:<15,} {metrics['latency_metrics']['avg_latency_ms']:<16.2f}")
     
-    # Plot model comparison
-    comparison_plot_path = os.path.join(args.output_dir, "model_comparison.png")
-    plot_comparison_bar(metrics_dict, comparison_plot_path)
-    
-    # Plot confusion matrices
-    cm_plot_path = os.path.join(args.output_dir, "confusion_matrices.png")
-    plot_confusion_matrices(metrics_dict, cm_plot_path)
-    
-    # Save metrics
-    metrics_path = os.path.join(args.output_dir, "model_metrics.csv")
-    metrics_df = pd.DataFrame({
-        "model_type": model_types,
-        "accuracy": [metrics_dict[m]["accuracy"] for m in model_types],
-        "precision": [metrics_dict[m]["precision"] for m in model_types],
-        "recall": [metrics_dict[m]["recall"] for m in model_types],
-        "f1": [metrics_dict[m]["f1"] for m in model_types]
-    })
-    metrics_df.to_csv(metrics_path, index=False)
-    
-    # Find best model
-    best_model = max(metrics_dict.items(), key=lambda x: x[1]["f1"])
-    best_model_name = best_model[0]
-    best_model_f1 = best_model[1]["f1"]
-    
-    print(f"\nBest model: {best_model_name} with F1 score of {best_model_f1:.4f}")
-    
-    # Generate comparison report if requested
+    # Generate comprehensive report
     if args.generate_report:
-        report_path = generate_comparison_report(
-            metrics_dict=metrics_dict,
-            histories=histories,
-            prediction_dfs=prediction_dfs,
-            output_dir=args.output_dir
-        )
-        print(f"Report saved to {report_path}")
+        print("\nGenerating model comparison report...")
+        generate_comparison_report(metrics_dict, histories, prediction_dfs, args.output_dir)
+
+def get_tokenizer(model_type):
+    """Get the appropriate tokenizer for a model type."""
+    from transformers import AutoTokenizer
+    import config
     
-    print("\nComparison complete!")
-    
+    if model_type.startswith("mlm_") or model_type.startswith("hybrid_"):
+        return AutoTokenizer.from_pretrained(config.BASE_MODEL_NAME)
+    else:
+        # For LSTM-CNN models, use a basic tokenizer
+        return AutoTokenizer.from_pretrained("bert-base-uncased")
 
 if __name__ == "__main__":
     main() 

@@ -343,6 +343,26 @@ def prepare_data_pipeline(use_caller_only=False, data_df=None, batch_size=config
     return train_dataloader, val_dataloader, test_dataloader, tokenizer
 
 
+def get_tokenizer(model_type):
+    """
+    Get the appropriate tokenizer for a model type.
+    
+    Args:
+        model_type (str): Model type identifier
+        
+    Returns:
+        tokenizer: Appropriate tokenizer for the model
+    """
+    from transformers import AutoTokenizer
+    import config
+    
+    if model_type.startswith("mlm_") or model_type.startswith("hybrid_"):
+        return AutoTokenizer.from_pretrained(config.BASE_MODEL_NAME)
+    else:
+        # For LSTM-CNN models, use a basic tokenizer
+        return AutoTokenizer.from_pretrained("bert-base-uncased")
+
+
 if __name__ == "__main__":
     # Test data preprocessing
     df = load_and_preprocess_data()
