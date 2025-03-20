@@ -70,7 +70,7 @@ const authService = {
 const predictionService = {
   predict: async (text) => {
     try {
-      const response = await api.post('/api/predict', { text });
+      const response = await api.post('/analyze', { text });
       return {
         success: true,
         data: response.data,
@@ -86,7 +86,7 @@ const predictionService = {
   
   checkHealth: async () => {
     try {
-      const response = await api.get('/api/health');
+      const response = await api.get('/');
       return {
         success: true,
         data: response.data,

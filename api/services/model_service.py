@@ -6,11 +6,13 @@ This module provides the service for loading and using the complaint detection m
 
 import json
 import logging
+import os
 from typing import Tuple
 
 import nltk
 import torch
 from nltk.tokenize import word_tokenize
+from transformers import RobertaTokenizer
 
 logger = logging.getLogger(__name__)
 
@@ -27,11 +29,13 @@ class ModelService:
         self.model_path = model_path
         self.model = None
         self.vocab = None
+        self.tokenizer = None
+        self.is_roberta = False
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.load_model()
         
     def load_model(self):
-        """Load the model and vocabulary."""
+        """Load the model and vocabulary/tokenizer."""
         try:
             # Ensure NLTK data is downloaded
             try:
@@ -40,6 +44,10 @@ class ModelService:
                 nltk.download('punkt')
             
             # Import project-specific modules
+            sys_path = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+            import sys
+            sys.path.append(sys_path)
+            
             from src.models.lstm_cnn_model import LSTMCNN
             from src.data.preprocessor import VocabBuilder
             
@@ -65,18 +73,26 @@ class ModelService:
             self.model.to(self.device)
             self.model.eval()
             
-            # Load vocabulary
+            # Check if we're using a RoBERTa tokenizer
             vocab_path = self.model_path.replace('.pt', '_vocab.json')
             with open(vocab_path, 'r') as f:
-                vocab_dict = json.load(f)
+                vocab_data = json.load(f)
             
-            self.vocab = VocabBuilder()
-            self.vocab.word2idx = vocab_dict['word2idx']
-            self.vocab.idx2word = {int(k): v for k, v in vocab_dict['idx2word'].items()}
+            # Check if this is a RoBERTa model
+            if 'tokenizer_name' in vocab_data and vocab_data['tokenizer_name'] == 'roberta-base':
+                self.is_roberta = True
+                self.tokenizer = RobertaTokenizer.from_pretrained('roberta-base')
+                logger.info("Using RoBERTa tokenizer")
+            else:
+                # Use the custom vocabulary
+                self.vocab = VocabBuilder()
+                self.vocab.word2idx = vocab_data['word2idx']
+                self.vocab.idx2word = {int(k): v for k, v in vocab_data['idx2word'].items()}
+                logger.info(f"Using custom vocabulary with size: {len(self.vocab.word2idx)}")
             
             logger.info(f"Model loaded successfully from {self.model_path}")
             logger.info(f"Using device: {self.device}")
-            logger.info(f"Vocabulary size: {len(self.vocab.word2idx)}")
+            logger.info(f"Model type: {'RoBERTa' if self.is_roberta else 'Custom'}")
             
         except Exception as e:
             logger.error(f"Failed to load model: {str(e)}")
@@ -97,27 +113,40 @@ class ModelService:
             RuntimeError: If model or vocabulary not loaded
             Exception: For other prediction errors
         """
-        if not self.model or not self.vocab:
-            raise RuntimeError("Model or vocabulary not loaded")
+        if not self.model or (not self.vocab and not self.tokenizer):
+            raise RuntimeError("Model or tokenizer not loaded")
             
         try:
-            # Tokenize and convert to indices
-            tokens = word_tokenize(text.lower())
-            indices = [self.vocab.word2idx.get(token, 1) for token in tokens]  # 1 is <UNK>
-            
-            # Ensure we have at least some tokens
-            if not indices:
-                return 0, 0.0
-            
-            # Pad sequence
-            max_length = 1024  # Use a standard max length
-            if len(indices) < max_length:
-                indices += [0] * (max_length - len(indices))  # 0 is <PAD>
+            # Process text based on tokenizer type
+            if self.is_roberta:
+                # Use RoBERTa tokenizer
+                max_length = 512
+                encoded = self.tokenizer.encode_plus(
+                    text,
+                    max_length=max_length,
+                    padding='max_length',
+                    truncation=True,
+                    return_tensors='pt'
+                )
+                indices_tensor = encoded['input_ids'].to(self.device)
             else:
-                indices = indices[:max_length]
-            
-            # Convert to tensor and move to device
-            indices_tensor = torch.tensor([indices], dtype=torch.long).to(self.device)
+                # Use custom vocabulary
+                tokens = word_tokenize(text.lower())
+                indices = [self.vocab.word2idx.get(token, 1) for token in tokens]  # 1 is <UNK>
+                
+                # Ensure we have at least some tokens
+                if not indices:
+                    return 0, 0.0
+                
+                # Pad sequence
+                max_length = 1024  # Use a standard max length
+                if len(indices) < max_length:
+                    indices += [0] * (max_length - len(indices))  # 0 is <PAD>
+                else:
+                    indices = indices[:max_length]
+                
+                # Convert to tensor and move to device
+                indices_tensor = torch.tensor([indices], dtype=torch.long).to(self.device)
             
             # Get prediction
             with torch.no_grad():

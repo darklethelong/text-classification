@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 
 # Import project modules
-from data.preprocessor import load_and_preprocess_data, prepare_dataloaders, get_class_weights
+from data.preprocessor import load_and_preprocess_data, prepare_dataloaders, get_class_weights, HuggingFaceVocab
 from models.lstm_cnn_model import LSTMCNN
 from models.mlm_model import get_mlm_model_and_tokenizer
 from utils.training import train_model, evaluate, measure_inference_latency, measure_inference_latency_cpu, measure_inference_latency_gpu
@@ -23,11 +23,12 @@ from evaluation.visualizations import (
     generate_model_comparison_table
 )
 
-def train_lstm_cnn_model(data_dict, model_dir, caller_only=False, device=None, max_epochs=15):
+def train_lstm_cnn_model(data_dict, model_dir, caller_only=False, device=None, max_epochs=15, use_roberta_tokenizer=False):
     """Train LSTM-CNN model."""
     
     model_type = 'lstm-cnn'
-    model_name = f"lstm_cnn_{'caller_only' if caller_only else 'full'}"
+    tokenizer_type = 'roberta' if use_roberta_tokenizer else 'custom'
+    model_name = f"lstm_cnn_{tokenizer_type}_{'caller_only' if caller_only else 'full'}"
     print(f"Training {model_name} model...")
     
     # Prepare dataloaders
@@ -35,11 +36,13 @@ def train_lstm_cnn_model(data_dict, model_dir, caller_only=False, device=None, m
         data_dict, 
         model_type=model_type, 
         batch_size=32, 
-        caller_only=caller_only
+        caller_only=caller_only,
+        use_roberta_tokenizer=use_roberta_tokenizer
     )
     
     # Get vocabulary size
     vocab_size = len(dataloaders['vocab'])
+    print(f"Vocabulary size: {vocab_size}")
     
     # Create model
     model = LSTMCNN(
@@ -50,7 +53,7 @@ def train_lstm_cnn_model(data_dict, model_dir, caller_only=False, device=None, m
         cnn_out_channels=100,
         kernel_sizes=[3, 5, 7],
         dropout=0.5,
-        padding_idx=0
+        padding_idx=0 if not use_roberta_tokenizer else dataloaders['vocab'].tokenizer.pad_token_id
     )
     
     # Move model to device
@@ -88,24 +91,21 @@ def train_lstm_cnn_model(data_dict, model_dir, caller_only=False, device=None, m
     print(f"Recall: {test_metrics['recall']:.4f}")
     print(f"F1 Score: {test_metrics['f1']:.4f}")
     
-    # Measure inference latency on CPU
+    # Measure CPU inference latency
     print(f"Measuring CPU inference latency for {model_name}...")
-    cpu_latency_metrics = measure_inference_latency_cpu(model, dataloaders['test'], num_samples=20)
+    cpu_latency_metrics = measure_inference_latency_cpu(model, dataloaders['test'])
     print(f"CPU inference latency for {model_name}:")
     print(f"Average: {cpu_latency_metrics['avg_latency'] * 1000:.2f} ms")
     print(f"95th percentile: {cpu_latency_metrics['p95_latency'] * 1000:.2f} ms")
     
-    # Measure inference latency on GPU if available
+    # Measure GPU inference latency if available
     gpu_latency_metrics = None
     if torch.cuda.is_available():
         print(f"Measuring GPU inference latency for {model_name}...")
-        gpu_latency_metrics = measure_inference_latency_gpu(model, dataloaders['test'], num_samples=20)
+        gpu_latency_metrics = measure_inference_latency_gpu(model, dataloaders['test'])
         print(f"GPU inference latency for {model_name}:")
         print(f"Average: {gpu_latency_metrics['avg_latency'] * 1000:.2f} ms")
         print(f"95th percentile: {gpu_latency_metrics['p95_latency'] * 1000:.2f} ms")
-    
-    # Use CPU latency for compatibility with original code
-    latency_metrics = cpu_latency_metrics
     
     # Plot training history
     history_save_path = os.path.join(model_dir, f"{model_name}_history.png")
@@ -126,19 +126,26 @@ def train_lstm_cnn_model(data_dict, model_dir, caller_only=False, device=None, m
     pr_save_path = os.path.join(model_dir, f"{model_name}_pr_curve.png")
     plot_precision_recall_curve(true_labels, probabilities, save_path=pr_save_path)
     
-    # Save vocabulary - CRITICAL FIX: Save vocabulary for inference
-    vocab_save_path = os.path.join(model_dir, f"{model_name}_vocab.json")
-    with open(vocab_save_path, 'w') as f:
+    # Save vocabulary for inference
+    if use_roberta_tokenizer:
+        # For RoBERTa tokenizer, we just save the tokenizer name
+        with open(os.path.join(model_dir, f"{model_name}_vocab.json"), 'w') as f:
+            json.dump({"tokenizer_name": "roberta-base"}, f)
+    else:
+        # For custom vocabulary, save the word2idx and idx2word mappings
+        vocab_save_path = os.path.join(model_dir, f"{model_name}_vocab.json")
         vocab_dict = {
-            'word2idx': {k: v for k, v in dataloaders['vocab'].word2idx.items()},
-            'idx2word': {str(k): v for k, v in dataloaders['vocab'].idx2word.items()} # Convert int keys to strings for JSON
+            "word2idx": dataloaders['vocab'].word2idx,
+            "idx2word": {str(k): v for k, v in dataloaders['vocab'].idx2word.items()},  # Convert int keys to str for JSON
         }
-        json.dump(vocab_dict, f, ensure_ascii=False, indent=2)
-    print(f"Vocabulary saved to {vocab_save_path}")
+        with open(vocab_save_path, 'w') as f:
+            json.dump(vocab_dict, f)
+        print(f"Vocabulary saved to {vocab_save_path}")
     
     # Save model metadata
     metadata = {
-        'model_type': model_type,
+        'model_type': 'lstm_cnn',
+        'tokenizer_type': tokenizer_type,
         'caller_only': caller_only,
         'vocab_size': vocab_size,
         'embedding_dim': 300,
@@ -147,54 +154,60 @@ def train_lstm_cnn_model(data_dict, model_dir, caller_only=False, device=None, m
         'cnn_out_channels': 100,
         'kernel_sizes': [3, 5, 7],
         'dropout': 0.5,
-        'training_history': {k: [float(val) for val in v] for k, v in history.items()},
-        'test_metrics': {k: float(v) if not isinstance(v, type(test_metrics['confusion_matrix'])) else v.tolist() 
-                         for k, v in test_metrics.items()},
-        'cpu_latency_metrics': {k: (float(v) if k not in ['raw_latencies', 'device'] else v) for k, v in cpu_latency_metrics.items()},
-        'gpu_latency_metrics': {k: (float(v) if k not in ['raw_latencies', 'device'] else v) for k, v in gpu_latency_metrics.items()} if gpu_latency_metrics else None,
+        'training_history': {k: [float(v) for v in vs] for k, vs in history.items()},
+        'test_metrics': {k: float(v) if isinstance(v, (int, float, bool)) else v.tolist() if hasattr(v, 'tolist') else v 
+                       for k, v in test_metrics.items()},
+        'cpu_latency_metrics': {
+            'avg_latency': float(cpu_latency_metrics['avg_latency']),
+            'p95_latency': float(cpu_latency_metrics['p95_latency']),
+        }
     }
     
-    # Save metadata
+    if gpu_latency_metrics is not None:
+        metadata['gpu_latency_metrics'] = {
+            'avg_latency': float(gpu_latency_metrics['avg_latency']),
+            'p95_latency': float(gpu_latency_metrics['p95_latency']),
+        }
+    
     metadata_save_path = os.path.join(model_dir, f"{model_name}_metadata.json")
     with open(metadata_save_path, 'w') as f:
-        json.dump(metadata, f, indent=4)
+        json.dump(metadata, f, indent=2)
     
     return {
         'model': model,
         'test_metrics': test_metrics,
-        'cpu_latency_metrics': cpu_latency_metrics,
+        'latency_metrics': cpu_latency_metrics,
         'gpu_latency_metrics': gpu_latency_metrics,
+        'history': history,
         'vocab': dataloaders['vocab']
     }
 
-def train_mlm_model(data_dict, model_dir, caller_only=False, device=None, max_epochs=10):
-    """Train MLM-based model."""
+def train_mlm_model(data_dict, model_dir, caller_only=False, device=None, max_epochs=10, model_name_or_path="roberta-base"):
+    """Train MLM model."""
     
-    model_type = 'mlm'
     model_name = f"mlm_{'caller_only' if caller_only else 'full'}"
     print(f"Training {model_name} model...")
     
-    # Get pre-trained model and tokenizer
-    model, tokenizer = get_mlm_model_and_tokenizer()
-    
-    # Prepare dataloaders
-    dataloaders = prepare_dataloaders(
-        data_dict, 
-        tokenizer=tokenizer,
-        model_type=model_type, 
-        batch_size=16,  # Smaller batch size due to memory constraints
-        caller_only=caller_only
-    )
+    # Get model and tokenizer
+    model, tokenizer = get_mlm_model_and_tokenizer(model_name_or_path)
     
     # Move model to device
     model = model.to(device)
     
-    # Remove class weights - no longer using them for balanced learning
+    # Prepare dataloaders
+    dataloaders = prepare_dataloaders(
+        data_dict, 
+        tokenizer=tokenizer, 
+        model_type='mlm', 
+        batch_size=16,  # Smaller batch size for transformer models
+        max_length=512,  # Shorter sequences for transformer models
+        caller_only=caller_only
+    )
     
     # Define loss function, optimizer, and scheduler
-    criterion = nn.CrossEntropyLoss()  # Removed class weights
-    optimizer = optim.AdamW(model.parameters(), lr=2e-5, weight_decay=1e-2)
-    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=2, verbose=True)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.AdamW(model.parameters(), lr=2e-5, weight_decay=1e-4)
+    scheduler = ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=1, verbose=True)
     
     # Create model save path
     model_save_path = os.path.join(model_dir, f"{model_name}.pt")
@@ -221,24 +234,21 @@ def train_mlm_model(data_dict, model_dir, caller_only=False, device=None, max_ep
     print(f"Recall: {test_metrics['recall']:.4f}")
     print(f"F1 Score: {test_metrics['f1']:.4f}")
     
-    # Measure inference latency on CPU
+    # Measure CPU inference latency
     print(f"Measuring CPU inference latency for {model_name}...")
-    cpu_latency_metrics = measure_inference_latency_cpu(model, dataloaders['test'], num_samples=20)
+    cpu_latency_metrics = measure_inference_latency_cpu(model, dataloaders['test'])
     print(f"CPU inference latency for {model_name}:")
     print(f"Average: {cpu_latency_metrics['avg_latency'] * 1000:.2f} ms")
     print(f"95th percentile: {cpu_latency_metrics['p95_latency'] * 1000:.2f} ms")
     
-    # Measure inference latency on GPU if available
+    # Measure GPU inference latency if available
     gpu_latency_metrics = None
     if torch.cuda.is_available():
         print(f"Measuring GPU inference latency for {model_name}...")
-        gpu_latency_metrics = measure_inference_latency_gpu(model, dataloaders['test'], num_samples=20)
+        gpu_latency_metrics = measure_inference_latency_gpu(model, dataloaders['test'])
         print(f"GPU inference latency for {model_name}:")
         print(f"Average: {gpu_latency_metrics['avg_latency'] * 1000:.2f} ms")
         print(f"95th percentile: {gpu_latency_metrics['p95_latency'] * 1000:.2f} ms")
-    
-    # Use CPU latency for compatibility with original code
-    latency_metrics = cpu_latency_metrics
     
     # Plot training history
     history_save_path = os.path.join(model_dir, f"{model_name}_history.png")
@@ -261,47 +271,49 @@ def train_mlm_model(data_dict, model_dir, caller_only=False, device=None, max_ep
     
     # Save model metadata
     metadata = {
-        'model_type': model_type,
+        'model_type': 'mlm',
         'caller_only': caller_only,
-        'pretrained_model': "jinaai/jina-embeddings-v2-small-en",
-        'training_history': {k: [float(val) for val in v] for k, v in history.items()},
-        'test_metrics': {k: float(v) if not isinstance(v, type(test_metrics['confusion_matrix'])) else v.tolist() 
-                         for k, v in test_metrics.items()},
-        'cpu_latency_metrics': {k: (float(v) if k not in ['raw_latencies', 'device'] else v) for k, v in cpu_latency_metrics.items()},
-        'gpu_latency_metrics': {k: (float(v) if k not in ['raw_latencies', 'device'] else v) for k, v in gpu_latency_metrics.items()} if gpu_latency_metrics else None,
+        'model_name_or_path': model_name_or_path,
+        'training_history': {k: [float(v) for v in vs] for k, vs in history.items()},
+        'test_metrics': {k: float(v) if isinstance(v, (int, float, bool)) else v.tolist() if hasattr(v, 'tolist') else v 
+                       for k, v in test_metrics.items()},
+        'cpu_latency_metrics': {
+            'avg_latency': float(cpu_latency_metrics['avg_latency']),
+            'p95_latency': float(cpu_latency_metrics['p95_latency']),
+        }
     }
     
-    # Save metadata
+    if gpu_latency_metrics is not None:
+        metadata['gpu_latency_metrics'] = {
+            'avg_latency': float(gpu_latency_metrics['avg_latency']),
+            'p95_latency': float(gpu_latency_metrics['p95_latency']),
+        }
+    
     metadata_save_path = os.path.join(model_dir, f"{model_name}_metadata.json")
     with open(metadata_save_path, 'w') as f:
-        json.dump(metadata, f, indent=4)
-    
-    # Save tokenizer
-    tokenizer_save_path = os.path.join(model_dir, f"{model_name}_tokenizer")
-    tokenizer.save_pretrained(tokenizer_save_path)
+        json.dump(metadata, f, indent=2)
     
     return {
         'model': model,
         'test_metrics': test_metrics,
-        'cpu_latency_metrics': cpu_latency_metrics,
+        'latency_metrics': cpu_latency_metrics,
         'gpu_latency_metrics': gpu_latency_metrics,
+        'history': history,
         'tokenizer': tokenizer
     }
 
 def main():
     parser = argparse.ArgumentParser(description='Train and evaluate complaint detection models')
-    parser.add_argument('--data_file', type=str, default='train.csv', help='Path to the data file')
-    parser.add_argument('--output_dir', type=str, default='output', help='Output directory for models and results')
+    parser.add_argument('--data_file', type=str, required=True, help='Path to data file')
+    parser.add_argument('--output_dir', type=str, required=True, help='Directory to save model and results')
     parser.add_argument('--models', type=str, default='all', 
-                        choices=['all', 'lstm_cnn_full', 'lstm_cnn_caller_only', 'mlm_full', 'mlm_caller_only'],
-                        help='Which models to train')
-    parser.add_argument('--max_rows', type=int, default=None, help='Maximum number of rows to load (for testing)')
-    parser.add_argument('--max_epochs', type=int, default=None, help='Maximum number of epochs to train')
+                        choices=['all', 'lstm_cnn_custom_full', 'lstm_cnn_custom_caller_only', 
+                                'lstm_cnn_roberta_full', 'lstm_cnn_roberta_caller_only',
+                                'mlm_full', 'mlm_caller_only'], 
+                        help='Models to train')
+    parser.add_argument('--max_rows', type=int, default=None, help='Maximum number of rows to use')
+    parser.add_argument('--max_epochs', type=int, default=None, help='Maximum number of epochs')
     args = parser.parse_args()
-    
-    # Set max_epochs for each model
-    # lstm_cnn_epochs = 1 if args.max_epochs is not None else 15
-    # mlm_epochs = 1 if args.max_epochs is not None else 10
     
     # Create output directory
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -314,87 +326,102 @@ def main():
     
     # Load and preprocess data
     print("Loading and preprocessing data...")
-    data_dict = load_and_preprocess_data(args.data_file)
+    data_dict = load_and_preprocess_data(args.data_file, max_rows=args.max_rows)
     
-    # If max_rows is specified, limit the data
-    if args.max_rows is not None:
-        print(f"Limiting to {args.max_rows} rows for testing")
-        # Create a smaller subset for testing
-        import random
-        random.seed(42)
-        
-        train_indices = random.sample(range(len(data_dict['train']['texts'])), 
-                                     min(args.max_rows, len(data_dict['train']['texts'])))
-        val_indices = random.sample(range(len(data_dict['val']['texts'])), 
-                                    min(args.max_rows // 5, len(data_dict['val']['texts'])))
-        test_indices = random.sample(range(len(data_dict['test']['texts'])), 
-                                    min(args.max_rows // 5, len(data_dict['test']['texts'])))
-        
-        data_dict['train']['texts'] = [data_dict['train']['texts'][i] for i in train_indices]
-        data_dict['train']['labels'] = [data_dict['train']['labels'][i] for i in train_indices]
-        data_dict['val']['texts'] = [data_dict['val']['texts'][i] for i in val_indices]
-        data_dict['val']['labels'] = [data_dict['val']['labels'][i] for i in val_indices]
-        data_dict['test']['texts'] = [data_dict['test']['texts'][i] for i in test_indices]
-        data_dict['test']['labels'] = [data_dict['test']['labels'][i] for i in test_indices]
+    # Set epochs for each model type if provided
+    lstm_cnn_epochs = args.max_epochs if args.max_epochs is not None else 15
+    mlm_epochs = args.max_epochs if args.max_epochs is not None else 10
     
-    # Print dataset statistics
-    print("Dataset statistics:")
-    print(f"Total samples: {len(data_dict['full_df'])}")
-    print(f"Training samples: {len(data_dict['train']['texts'])}")
-    print(f"Validation samples: {len(data_dict['val']['texts'])}")
-    print(f"Test samples: {len(data_dict['test']['texts'])}")
-    
-    complaint_count = sum(data_dict['full_df']['binary_label'])
-    print(f"Complaint ratio: {complaint_count / len(data_dict['full_df']) * 100:.2f}%")
-    
-    # Train and evaluate models
+    # Dictionary to store model results
     models_results = {}
     
-    # Train LSTM-CNN full conversation model
-    if args.models in ['all', 'lstm_cnn_full']:
-        lstm_cnn_full_results = train_lstm_cnn_model(data_dict, model_dir, caller_only=False, device=device, max_epochs=args.max_epochs)
-        models_results['LSTM-CNN (Full)'] = lstm_cnn_full_results
+    # Train LSTM-CNN with custom vocab (full conversation)
+    if args.models in ['all', 'lstm_cnn_custom_full']:
+        lstm_cnn_custom_full_results = train_lstm_cnn_model(
+            data_dict, model_dir, caller_only=False, device=device, 
+            max_epochs=lstm_cnn_epochs, use_roberta_tokenizer=False
+        )
+        models_results['LSTM-CNN Custom Vocab (Full)'] = lstm_cnn_custom_full_results
     
-    # Train LSTM-CNN caller-only model
-    if args.models in ['all', 'lstm_cnn_caller_only']:
-        lstm_cnn_caller_results = train_lstm_cnn_model(data_dict, model_dir, caller_only=True, device=device, max_epochs=args.max_epochs)
-        models_results['LSTM-CNN (Caller-Only)'] = lstm_cnn_caller_results
+    # Train LSTM-CNN with custom vocab (caller-only)
+    if args.models in ['all', 'lstm_cnn_custom_caller_only']:
+        lstm_cnn_custom_caller_results = train_lstm_cnn_model(
+            data_dict, model_dir, caller_only=True, device=device, 
+            max_epochs=lstm_cnn_epochs, use_roberta_tokenizer=False
+        )
+        models_results['LSTM-CNN Custom Vocab (Caller-Only)'] = lstm_cnn_custom_caller_results
+    
+    # Train LSTM-CNN with RoBERTa tokenizer (full conversation)
+    if args.models in ['all', 'lstm_cnn_roberta_full']:
+        lstm_cnn_roberta_full_results = train_lstm_cnn_model(
+            data_dict, model_dir, caller_only=False, device=device, 
+            max_epochs=lstm_cnn_epochs, use_roberta_tokenizer=True
+        )
+        models_results['LSTM-CNN RoBERTa (Full)'] = lstm_cnn_roberta_full_results
+    
+    # Train LSTM-CNN with RoBERTa tokenizer (caller-only)
+    if args.models in ['all', 'lstm_cnn_roberta_caller_only']:
+        lstm_cnn_roberta_caller_results = train_lstm_cnn_model(
+            data_dict, model_dir, caller_only=True, device=device, 
+            max_epochs=lstm_cnn_epochs, use_roberta_tokenizer=True
+        )
+        models_results['LSTM-CNN RoBERTa (Caller-Only)'] = lstm_cnn_roberta_caller_results
     
     # Train MLM full conversation model
     if args.models in ['all', 'mlm_full']:
-        mlm_full_results = train_mlm_model(data_dict, model_dir, caller_only=False, device=device, max_epochs=args.max_epochs)
+        mlm_full_results = train_mlm_model(
+            data_dict, model_dir, caller_only=False, device=device, 
+            max_epochs=mlm_epochs
+        )
         models_results['MLM (Full)'] = mlm_full_results
     
     # Train MLM caller-only model
     if args.models in ['all', 'mlm_caller_only']:
-        mlm_caller_results = train_mlm_model(data_dict, model_dir, caller_only=True, device=device, max_epochs=args.max_epochs)
+        mlm_caller_results = train_mlm_model(
+            data_dict, model_dir, caller_only=True, device=device, 
+            max_epochs=mlm_epochs
+        )
         models_results['MLM (Caller-Only)'] = mlm_caller_results
     
-    # Compare models if multiple models were trained
+    # Compare models if more than one model was trained
     if len(models_results) > 1:
-        # Extract metrics for comparison
+        # Extract test metrics for comparison
         test_metrics = {name: results['test_metrics'] for name, results in models_results.items()}
-        cpu_latency_metrics = {name: results['cpu_latency_metrics'] for name, results in models_results.items()}
-        gpu_latency_metrics = {name: results['gpu_latency_metrics'] for name, results in models_results.items()}
+        
+        # Extract latency metrics for comparison
+        latency_metrics = {name: results['latency_metrics'] for name, results in models_results.items()}
+        
+        # Compare models visually
+        metrics_save_path = os.path.join(model_dir, "model_comparison.png")
+        compare_models(test_metrics, save_path=metrics_save_path)
+        
+        # Compare latency
+        latency_save_path = os.path.join(model_dir, "latency_comparison.png")
+        plot_latency_comparison(latency_metrics, save_path=latency_save_path)
         
         # Generate comparison table
-        comparison_table = generate_model_comparison_table(test_metrics, cpu_latency_metrics, gpu_latency_metrics)
-        print("\nModel Comparison:")
-        print(comparison_table)
+        table = generate_model_comparison_table(test_metrics, latency_metrics)
+        # Save the table as CSV
+        table_save_path = os.path.join(model_dir, "model_comparison_table.csv")
+        table.to_csv(table_save_path, index=False)
         
-        # Save comparison table
-        comparison_table_path = os.path.join(model_dir, "model_comparison.csv")
-        comparison_table.to_csv(comparison_table_path, index=False)
-        
-        # Plot F1 score comparison
-        f1_comparison_path = os.path.join(model_dir, "f1_comparison.png")
-        compare_models(test_metrics, metric_name='f1', save_path=f1_comparison_path)
-        
-        # Plot latency comparison
-        latency_comparison_path = os.path.join(model_dir, "latency_comparison.png")
-        plot_latency_comparison(cpu_latency_metrics, gpu_latency_metrics, save_path=latency_comparison_path)
+        # Also save as markdown for easy viewing
+        markdown_save_path = os.path.join(model_dir, "model_comparison.md")
+        with open(markdown_save_path, 'w') as f:
+            f.write("# Model Comparison\n\n")
+            f.write("## Test Metrics\n\n")
+            f.write("| Model | Accuracy | Precision | Recall | F1 Score |\n")
+            f.write("|-------|----------|-----------|--------|----------|\n")
+            for name, metrics in test_metrics.items():
+                f.write(f"| {name} | {metrics['accuracy']:.4f} | {metrics['precision']:.4f} | {metrics['recall']:.4f} | {metrics['f1']:.4f} |\n")
+            
+            f.write("\n## Latency Metrics (ms)\n\n")
+            f.write("| Model | Average | 95th Percentile |\n")
+            f.write("|-------|---------|----------------|\n")
+            for name, metrics in latency_metrics.items():
+                f.write(f"| {name} | {metrics['avg_latency'] * 1000:.2f} | {metrics['p95_latency'] * 1000:.2f} |\n")
     
     print(f"All models and results saved to {model_dir}")
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main() 

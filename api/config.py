@@ -9,7 +9,8 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings
+from pydantic import Field
 
 # Load environment variables from .env file if it exists
 env_path = Path('.') / '.env'

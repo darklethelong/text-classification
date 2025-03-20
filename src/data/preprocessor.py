@@ -7,6 +7,7 @@ import nltk
 from nltk.tokenize import word_tokenize
 from collections import Counter
 import numpy as np
+from transformers import AutoTokenizer, RobertaTokenizer
 
 # Download nltk resources
 try:
@@ -80,13 +81,35 @@ class VocabBuilder:
     def __len__(self):
         return len(self.word2idx)
 
+class HuggingFaceVocab:
+    """Adapter class to use Hugging Face tokenizers as vocabulary for LSTM-CNN models"""
+    def __init__(self, tokenizer_name="roberta-base"):
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        # Special tokens
+        self.word2idx = {
+            '<PAD>': self.tokenizer.pad_token_id,
+            '<UNK>': self.tokenizer.unk_token_id,
+        }
+        self.idx2word = {
+            self.tokenizer.pad_token_id: '<PAD>',
+            self.tokenizer.unk_token_id: '<UNK>'
+        }
+        
+    def __len__(self):
+        return len(self.tokenizer)
+    
+    def tokenize(self, text):
+        """Convert text to token ids using the HF tokenizer"""
+        return self.tokenizer.encode(text, add_special_tokens=False, truncation=True)
+
 class LSTMCNNDataset(Dataset):
-    def __init__(self, texts, labels, vocab, max_length=1024, caller_only=False):
+    def __init__(self, texts, labels, vocab, max_length=1024, caller_only=False, use_hf_tokenizer=False):
         self.texts = texts
         self.labels = labels
         self.vocab = vocab
         self.max_length = max_length
         self.caller_only = caller_only
+        self.use_hf_tokenizer = use_hf_tokenizer
         
     def __len__(self):
         return len(self.texts)
@@ -100,15 +123,26 @@ class LSTMCNNDataset(Dataset):
             caller_lines = [line for line in lines if line.startswith('Caller:')]
             text = ' '.join(caller_lines)
         
-        # Tokenize and convert to indices
-        tokens = word_tokenize(text.lower())
-        indices = [self.vocab.word2idx.get(token, 1) for token in tokens]  # 1 is <UNK>
-        
-        # Pad or truncate sequence
-        if len(indices) < self.max_length:
-            indices += [0] * (self.max_length - len(indices))  # 0 is <PAD>
+        # Tokenize using the appropriate method
+        if self.use_hf_tokenizer:
+            # Use Hugging Face tokenizer
+            indices = self.vocab.tokenize(text)
+            
+            # Pad or truncate sequence
+            if len(indices) < self.max_length:
+                indices += [self.vocab.tokenizer.pad_token_id] * (self.max_length - len(indices))
+            else:
+                indices = indices[:self.max_length]
         else:
-            indices = indices[:self.max_length]
+            # Use NLTK tokenizer with custom vocabulary
+            tokens = word_tokenize(text.lower())
+            indices = [self.vocab.word2idx.get(token, 1) for token in tokens]  # 1 is <UNK>
+            
+            # Pad or truncate sequence
+            if len(indices) < self.max_length:
+                indices += [0] * (self.max_length - len(indices))  # 0 is <PAD>
+            else:
+                indices = indices[:self.max_length]
         
         # Convert to tensors
         indices_tensor = torch.tensor(indices, dtype=torch.long)
@@ -132,10 +166,15 @@ def clean_text(text):
     
     return text.strip()
 
-def load_and_preprocess_data(file_path, test_size=0.15, val_size=0.15, random_state=42):
+def load_and_preprocess_data(file_path, test_size=0.15, val_size=0.15, random_state=42, max_rows=None):
     """Load data, clean, and split into train, validation, and test sets."""
     # Load CSV file
     df = pd.read_csv(file_path)
+    
+    # Limit dataset size if specified
+    if max_rows is not None and max_rows > 0 and max_rows < len(df):
+        print(f"Limiting to {max_rows} rows for testing")
+        df = df.sample(max_rows, random_state=random_state)
     
     # Clean text
     df['cleaned_text'] = df['text'].apply(clean_text)
@@ -155,6 +194,14 @@ def load_and_preprocess_data(file_path, test_size=0.15, val_size=0.15, random_st
         stratify=train_val_df['binary_label']
     )
     
+    # Print dataset statistics
+    print("Dataset statistics:")
+    print(f"Total samples: {len(df)}")
+    print(f"Training samples: {len(train_df)}")
+    print(f"Validation samples: {len(val_df)}")
+    print(f"Test samples: {len(test_df)}")
+    print(f"Complaint ratio: {df['binary_label'].mean() * 100:.2f}%")
+    
     return {
         'train': {
             'texts': train_df['cleaned_text'].tolist(),
@@ -172,7 +219,7 @@ def load_and_preprocess_data(file_path, test_size=0.15, val_size=0.15, random_st
     }
 
 def prepare_dataloaders(data_dict, tokenizer=None, vocab=None, batch_size=32, max_length=1024, 
-                        caller_only=False, model_type='mlm'):
+                        caller_only=False, model_type='mlm', use_roberta_tokenizer=False):
     """Prepare DataLoader objects for training and evaluation."""
     
     if model_type.lower() == 'mlm':
@@ -206,18 +253,25 @@ def prepare_dataloaders(data_dict, tokenizer=None, vocab=None, batch_size=32, ma
     
     elif model_type.lower() == 'lstm-cnn':
         # For LSTM-CNN models
-        if vocab is None:
-            # Build vocabulary if not provided
-            vocab_builder = VocabBuilder()
-            vocab_builder.build_vocab(data_dict['train']['texts'])
-            vocab = vocab_builder
+        if use_roberta_tokenizer:
+            # Use RoBERTa tokenizer
+            if vocab is None:
+                vocab = HuggingFaceVocab("roberta-base")
+        else:
+            # Use custom vocab
+            if vocab is None:
+                # Build vocabulary if not provided
+                vocab_builder = VocabBuilder()
+                vocab_builder.build_vocab(data_dict['train']['texts'])
+                vocab = vocab_builder
         
         train_dataset = LSTMCNNDataset(
             data_dict['train']['texts'], 
             data_dict['train']['labels'], 
             vocab, 
             max_length, 
-            caller_only
+            caller_only,
+            use_hf_tokenizer=use_roberta_tokenizer
         )
         
         val_dataset = LSTMCNNDataset(
@@ -225,7 +279,8 @@ def prepare_dataloaders(data_dict, tokenizer=None, vocab=None, batch_size=32, ma
             data_dict['val']['labels'], 
             vocab, 
             max_length, 
-            caller_only
+            caller_only,
+            use_hf_tokenizer=use_roberta_tokenizer
         )
         
         test_dataset = LSTMCNNDataset(
@@ -233,7 +288,8 @@ def prepare_dataloaders(data_dict, tokenizer=None, vocab=None, batch_size=32, ma
             data_dict['test']['labels'], 
             vocab, 
             max_length, 
-            caller_only
+            caller_only,
+            use_hf_tokenizer=use_roberta_tokenizer
         )
     
     else:

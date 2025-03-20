@@ -2,6 +2,48 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from tqdm import tqdm
+import json
+import os
+from nltk.tokenize import word_tokenize
+from transformers import AutoTokenizer
+
+def load_tokenizer_or_vocab(vocab_path, model_type):
+    """
+    Load tokenizer or vocabulary based on the model type.
+    
+    Args:
+        vocab_path: Path to vocabulary file
+        model_type: Type of model ('mlm' or 'lstm-cnn')
+        
+    Returns:
+        Tokenizer for MLM models or vocabulary for LSTM-CNN models
+    """
+    if not os.path.exists(vocab_path):
+        raise FileNotFoundError(f"Vocabulary file not found: {vocab_path}")
+    
+    if model_type.lower() == 'mlm':
+        # For MLM models, load tokenizer
+        return AutoTokenizer.from_pretrained(vocab_path)
+    else:
+        # For LSTM-CNN models, load vocabulary
+        with open(vocab_path, 'r') as f:
+            vocab_dict = json.load(f)
+        
+        # Check if it's a RoBERTa tokenizer
+        if "tokenizer_name" in vocab_dict:
+            # Load RoBERTa tokenizer
+            return AutoTokenizer.from_pretrained(vocab_dict["tokenizer_name"])
+        else:
+            # Create a vocabulary object for custom vocab
+            class Vocabulary:
+                def __init__(self, word2idx, idx2word):
+                    self.word2idx = word2idx
+                    self.idx2word = {int(k): v for k, v in idx2word.items()}  # Convert str keys back to int
+                
+                def __len__(self):
+                    return len(self.word2idx)
+            
+            return Vocabulary(vocab_dict["word2idx"], vocab_dict["idx2word"])
 
 def predict(model, data_loader, device):
     """
@@ -105,16 +147,26 @@ def predict_single_text(model, text, tokenizer=None, vocab=None, device=None, ma
         if vocab is None:
             raise ValueError("Vocabulary must be provided for LSTM-CNN models.")
         
-        # Tokenize and convert to indices
-        from nltk.tokenize import word_tokenize
-        tokens = word_tokenize(text.lower())
-        indices = [vocab.word2idx.get(token, 1) for token in tokens]  # 1 is <UNK>
-        
-        # Pad or truncate sequence
-        if len(indices) < max_length:
-            indices += [0] * (max_length - len(indices))  # 0 is <PAD>
+        # Check if using RoBERTa tokenizer
+        if hasattr(vocab, 'tokenize'):
+            # Using RoBERTa tokenizer
+            indices = vocab.tokenize(text)
+            
+            # Pad or truncate sequence
+            if len(indices) < max_length:
+                indices += [vocab.tokenizer.pad_token_id] * (max_length - len(indices))
+            else:
+                indices = indices[:max_length]
         else:
-            indices = indices[:max_length]
+            # Using custom vocabulary
+            tokens = word_tokenize(text.lower())
+            indices = [vocab.word2idx.get(token, 1) for token in tokens]  # 1 is <UNK>
+            
+            # Pad or truncate sequence
+            if len(indices) < max_length:
+                indices += [0] * (max_length - len(indices))  # 0 is <PAD>
+            else:
+                indices = indices[:max_length]
         
         # Convert to tensor and move to device
         indices_tensor = torch.tensor([indices], dtype=torch.long).to(device)
