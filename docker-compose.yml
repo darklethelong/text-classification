@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  complaint-detection-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: complaint-detection-system
+    ports:
+      - "8000:8000"
+    environment:
+      - TOKEN_SECRET_KEY=CHANGE_ME_IN_PRODUCTION
+      - MODEL_PATH=/app/models
+      - ENABLE_AUTH=true
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=adminpassword  # Change in production
+      - MAX_CONTENT_LENGTH=10000  # Maximum content length for requests
+    volumes:
+      - ./models:/app/models
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s 

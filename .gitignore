@@ -1,3 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+.venv/
+ENV/
+.pytest_cache/
+
+# Node.js and React
+ui/node_modules/
+ui/.pnp
+ui/.pnp.js
+ui/coverage/
+ui/build/
+ui/.DS_Store
+ui/.env.local
+ui/.env.development.local
+ui/.env.test.local
+ui/.env.production.local
+ui/npm-debug.log*
+ui/yarn-debug.log*
+ui/yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+
+# Docker
+.docker/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Model outputs and data files
+output/
+models/*
+!models/.gitkeep
+data/*
+!data/.gitkeep
+*.csv
+*.json
+*.xlsx
+*.pt
+!requirements.txt
+
+# Misc
+.coverage
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
 # Data files
 train.csv
 

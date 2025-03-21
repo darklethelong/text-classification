@@ -68,9 +68,47 @@ const authService = {
 
 // Prediction services
 const predictionService = {
+  // Analyze a single chunk
+  analyzeChunk: async (text) => {
+    try {
+      const response = await api.post('/analyze/chunk', { text });
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('Chunk analysis error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Failed to analyze chunk',
+      };
+    }
+  },
+  
+  // Analyze a full conversation
+  analyzeConversation: async (text) => {
+    try {
+      const response = await api.post('/analyze/conversation', { 
+        text,
+        chunk_size: 4 // Fixed to 4 utterances as required by the model
+      });
+      return {
+        success: true,
+        data: response.data,
+      };
+    } catch (error) {
+      console.error('Conversation analysis error:', error);
+      return {
+        success: false,
+        error: error.response?.data?.detail || 'Failed to analyze conversation',
+      };
+    }
+  },
+  
+  // Backward compatibility with previous API
   predict: async (text) => {
     try {
-      const response = await api.post('/analyze', { text });
+      const response = await api.post('/analyze/chunk', { text });
       return {
         success: true,
         data: response.data,

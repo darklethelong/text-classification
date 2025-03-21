@@ -19,6 +19,7 @@ import { Line, Bar } from 'react-chartjs-2';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import StackedBarChartIcon from '@mui/icons-material/StackedBarChart';
 import TimelineIcon from '@mui/icons-material/Timeline';
+import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 
 // Register ChartJS components
 ChartJS.register(
@@ -50,12 +51,35 @@ const ComplaintChart = ({ analyzedData }) => {
     
     const { chunks } = analyzedData;
     
-    // Prepare data for chart
-    const labels = chunks.map((_, index) => `Chunk ${index + 1}`);
-    const confidenceData = chunks.map(chunk => chunk.confidence * 100);
-    const isComplaintData = chunks.map(chunk => chunk.isComplaint ? 100 : 0);
+    // Sort chunks by timestamp if available
+    const sortedChunks = [...chunks].sort((a, b) => {
+      const timeA = a.timestamp ? new Date(a.timestamp) : 0;
+      const timeB = b.timestamp ? new Date(b.timestamp) : 0;
+      return timeA - timeB;
+    });
     
-    // Format for line chart
+    // Prepare data for chart
+    const labels = sortedChunks.map((chunk, index) => {
+      if (chunk.timestamp) {
+        const date = new Date(chunk.timestamp);
+        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      }
+      return `Chunk ${index + 1}`;
+    });
+    
+    const confidenceData = sortedChunks.map(chunk => chunk.confidence * 100);
+    const isComplaintData = sortedChunks.map(chunk => chunk.isComplaint ? 100 : 0);
+    
+    // Create gradient for area chart
+    const getGradient = (ctx, chartArea) => {
+      if (!ctx || !chartArea) return null;
+      const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+      gradient.addColorStop(0, 'rgba(63, 81, 181, 0.0)');
+      gradient.addColorStop(1, 'rgba(63, 81, 181, 0.3)');
+      return gradient;
+    };
+    
+    // Format for stock-like line chart
     const lineChartData = {
       labels,
       datasets: [
@@ -63,14 +87,20 @@ const ComplaintChart = ({ analyzedData }) => {
           label: 'Complaint Confidence (%)',
           data: confidenceData,
           borderColor: 'rgba(63, 81, 181, 1)',
-          backgroundColor: 'rgba(63, 81, 181, 0.2)',
-          tension: 0.3,
+          backgroundColor: function(context) {
+            const chart = context.chart;
+            const {ctx, chartArea} = chart;
+            if (!chartArea) return null;
+            return getGradient(ctx, chartArea);
+          },
+          tension: 0.4,
           fill: true,
-          pointBackgroundColor: chunks.map(chunk => 
+          pointBackgroundColor: sortedChunks.map(chunk => 
             chunk.isComplaint ? 'rgba(244, 67, 54, 1)' : 'rgba(76, 175, 80, 1)'
           ),
           pointRadius: 5,
           pointHoverRadius: 7,
+          borderWidth: 2,
         }
       ]
     };
@@ -82,10 +112,10 @@ const ComplaintChart = ({ analyzedData }) => {
         {
           label: 'Complaint Confidence (%)',
           data: confidenceData,
-          backgroundColor: chunks.map(chunk => 
+          backgroundColor: sortedChunks.map(chunk => 
             chunk.isComplaint ? 'rgba(244, 67, 54, 0.7)' : 'rgba(76, 175, 80, 0.7)'
           ),
-          borderColor: chunks.map(chunk => 
+          borderColor: sortedChunks.map(chunk => 
             chunk.isComplaint ? 'rgba(244, 67, 54, 1)' : 'rgba(76, 175, 80, 1)'
           ),
           borderWidth: 1,
@@ -116,6 +146,35 @@ const ComplaintChart = ({ analyzedData }) => {
       ]
     };
     
+    // Format for stock-like area chart
+    const stockChartData = {
+      labels,
+      datasets: [
+        {
+          label: 'Complaint Confidence (%)',
+          data: confidenceData,
+          borderColor: 'rgba(33, 150, 243, 1)',
+          backgroundColor: function(context) {
+            const chart = context.chart;
+            const {ctx, chartArea} = chart;
+            if (!chartArea) return null;
+            const gradient = ctx.createLinearGradient(0, chartArea.bottom, 0, chartArea.top);
+            gradient.addColorStop(0, 'rgba(33, 150, 243, 0.0)');
+            gradient.addColorStop(1, 'rgba(33, 150, 243, 0.3)');
+            return gradient;
+          },
+          tension: 0.3,
+          fill: true,
+          pointBackgroundColor: sortedChunks.map(chunk => 
+            chunk.isComplaint ? 'rgba(244, 67, 54, 1)' : 'rgba(76, 175, 80, 1)'
+          ),
+          pointRadius: 4,
+          pointHoverRadius: 6,
+          borderWidth: 2,
+        }
+      ]
+    };
+    
     // Set chart data based on type
     if (chartType === 'line') {
       setChartData(lineChartData);
@@ -123,6 +182,8 @@ const ComplaintChart = ({ analyzedData }) => {
       setChartData(barChartData);
     } else if (chartType === 'comparison') {
       setChartData(comparisonChartData);
+    } else if (chartType === 'stock') {
+      setChartData(stockChartData);
     }
     
   }, [analyzedData, chartType]);
@@ -134,15 +195,21 @@ const ComplaintChart = ({ analyzedData }) => {
       y: {
         beginAtZero: true,
         max: 100,
+        grid: {
+          color: 'rgba(0, 0, 0, 0.05)'
+        },
         title: {
           display: true,
           text: 'Percentage (%)'
         }
       },
       x: {
+        grid: {
+          display: false
+        },
         title: {
           display: true,
-          text: 'Conversation Chunks'
+          text: 'Timestamp'
         }
       }
     },
@@ -163,7 +230,7 @@ const ComplaintChart = ({ analyzedData }) => {
             return label;
           },
           footer: function(tooltipItems) {
-            if (chartType === 'line' || chartType === 'bar') {
+            if (chartType === 'line' || chartType === 'bar' || chartType === 'stock') {
               const index = tooltipItems[0].dataIndex;
               const isComplaint = analyzedData.chunks[index].isComplaint;
               return `Status: ${isComplaint ? 'Complaint' : 'Non-complaint'}`;
@@ -172,6 +239,9 @@ const ComplaintChart = ({ analyzedData }) => {
           }
         }
       }
+    },
+    animation: {
+      duration: 1000
     }
   };
   
@@ -206,6 +276,9 @@ const ComplaintChart = ({ analyzedData }) => {
             <ToggleButton value="line" aria-label="line chart">
               <TimelineIcon fontSize="small" />
             </ToggleButton>
+            <ToggleButton value="stock" aria-label="stock chart">
+              <TrendingUpIcon fontSize="small" />
+            </ToggleButton>
             <ToggleButton value="bar" aria-label="bar chart">
               <StackedBarChartIcon fontSize="small" />
             </ToggleButton>
@@ -220,11 +293,13 @@ const ComplaintChart = ({ analyzedData }) => {
             ? 'Line chart showing complaint confidence across conversation chunks. Red points indicate detected complaints.'
             : chartType === 'bar'
             ? 'Bar chart showing complaint confidence levels for each chunk. Red bars indicate detected complaints.'
+            : chartType === 'stock'
+            ? 'Stock-like chart showing complaint confidence trend over time. Red points indicate detected complaints.'
             : 'Comparison chart showing both complaint status and confidence levels.'}
         </Typography>
         
         <Box sx={{ height: 300 }}>
-          {chartType === 'line' && <Line data={chartData} options={chartOptions} />}
+          {(chartType === 'line' || chartType === 'stock') && <Line data={chartData} options={chartOptions} />}
           {chartType === 'bar' && <Bar data={chartData} options={chartOptions} />}
           {chartType === 'comparison' && <Bar data={chartData} options={chartOptions} />}
         </Box>

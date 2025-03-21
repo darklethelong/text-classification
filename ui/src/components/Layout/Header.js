@@ -11,22 +11,30 @@ const Header = ({ user, onLogout }) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   
+  const textStyle = {
+    color: 'var(--text-color)',
+    fontSize: '1.2rem'
+  };
+
   return (
     <AppBar position="sticky" elevation={1} color="default">
       <Container maxWidth="xl">
         <Toolbar disableGutters>
           <AnalyticsIcon sx={{ mr: 1, color: 'primary.main' }} />
-          <Typography
-            variant="h6"
-            noWrap
-            sx={{
+          <Typography 
+            variant="h6" 
+            component="div" 
+            sx={{ 
+              ...textStyle,
               flexGrow: 1,
-              fontWeight: 700,
-              color: 'primary.main',
-              textDecoration: 'none',
+              fontFamily: 'monospace',
+              fontWeight: 'bold',
+              textShadow: '0 0 10px var(--neon-green)',
+              letterSpacing: '.1rem',
+              fontSize: '1.5rem !important'
             }}
           >
-            Complaint Detection UI
+            COMPLAINT DETECTION UI
           </Typography>
           
           {user && (

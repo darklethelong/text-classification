@@ -51,7 +51,7 @@ export const parseConversation = (text) => {
 };
 
 /**
- * Chunk a conversation into groups of N utterances for analysis
+ * Chunk a conversation into groups of N utterances for analysis using a sliding window approach
  * @param {Array} utterances - Array of utterance objects
  * @param {number} chunkSize - Number of utterances per chunk
  * @returns {Array} Array of conversation chunks
@@ -59,15 +59,31 @@ export const parseConversation = (text) => {
 export const chunkConversation = (utterances, chunkSize = 4) => {
   const chunks = [];
   
-  // Group utterances into chunks of size chunkSize
-  for (let i = 0; i < utterances.length; i += chunkSize) {
+  // If we have fewer utterances than the chunk size, just return one chunk
+  if (utterances.length <= chunkSize) {
+    return [{
+      id: 'chunk-1',
+      utterances: utterances,
+      isComplaint: false,
+      confidence: 0,
+      text: utterances.map(u => `${u.speaker}: ${u.content}`).join('\n'),
+      windowStart: 1,
+      windowEnd: utterances.length
+    }];
+  }
+  
+  // Use sliding window approach to analyze overlapping chunks
+  // For each possible starting position
+  for (let i = 0; i <= utterances.length - chunkSize; i++) {
     const chunk = utterances.slice(i, i + chunkSize);
     chunks.push({
-      id: `chunk-${i / chunkSize + 1}`,
+      id: `chunk-${i + 1}`,
       utterances: chunk,
       isComplaint: false, // Will be filled in by analysis
       confidence: 0,
       text: chunk.map(u => `${u.speaker}: ${u.content}`).join('\n'),
+      windowStart: i + 1,
+      windowEnd: i + chunkSize
     });
   }
   
@@ -110,4 +126,92 @@ export const calculateCallerComplaintPercentage = (utterances) => {
   
   const complaintUtterances = callerUtterances.filter(u => u.isComplaint);
   return (complaintUtterances.length / callerUtterances.length) * 100;
+};
+
+/**
+ * Reconstruct data from API response into frontend-friendly format.
+ * This handles the sliding window data from the backend.
+ * @param {Array} chunks - Array of chunks from API response
+ * @param {Array} utterances - Array of all utterances
+ * @returns {Object} Object with utterances and chunks
+ */
+export const reconstructFromApiResponse = (responseData) => {
+  if (!responseData || !responseData.chunks || !responseData.chunks.length) {
+    return {
+      utterances: [],
+      chunks: []
+    };
+  }
+  
+  // Extract all utterances in order
+  const allUtterances = [];
+  const seenUtteranceIds = new Map(); // Changed to Map to track order
+  let utteranceOrder = 0;
+  
+  // Process all utterances from all chunks
+  responseData.chunks.forEach(chunk => {
+    chunk.utterances.forEach(utterance => {
+      // Create a unique ID for each utterance based on content and speaker
+      const utteranceId = `${utterance.speaker}:${utterance.content}`;
+      
+      if (!seenUtteranceIds.has(utteranceId)) {
+        // Store the order of appearance in the Map
+        seenUtteranceIds.set(utteranceId, utteranceOrder++);
+        allUtterances.push({
+          ...utterance,
+          utteranceId, // Store the ID for sorting
+          isComplaint: false // Default value, will be updated based on chunks
+        });
+      }
+    });
+  });
+  
+  // Sort utterances by their appearance order
+  allUtterances.sort((a, b) => {
+    return seenUtteranceIds.get(a.utteranceId) - seenUtteranceIds.get(b.utteranceId);
+  });
+  
+  // Update isComplaint flag for utterances based on chunks
+  responseData.chunks.forEach(chunk => {
+    if (chunk.is_complaint) {
+      chunk.utterances.forEach(chunkUtterance => {
+        const matchingUtterance = allUtterances.find(u => 
+          u.speaker === chunkUtterance.speaker && 
+          u.content === chunkUtterance.content
+        );
+        
+        if (matchingUtterance) {
+          matchingUtterance.isComplaint = true;
+        }
+      });
+    }
+  });
+  
+  // Process chunks
+  const processedChunks = responseData.chunks.map(chunk => {
+    // Log to debug the window information
+    console.log(`Processing chunk ID ${chunk.id} with window_start=${chunk.window_start}, window_end=${chunk.window_end}`);
+    
+    return {
+      id: chunk.id,
+      isComplaint: chunk.is_complaint,
+      confidence: chunk.confidence,
+      utterances: chunk.utterances.map(u => ({
+        speaker: u.speaker,
+        content: u.content,
+        isComplaint: u.isComplaint || false
+      })),
+      // Ensure these properties are properly mapped
+      windowStart: chunk.window_start || null,
+      windowEnd: chunk.window_end || null,
+      text: chunk.text
+    };
+  });
+  
+  console.log('Processed chunks with window information:', processedChunks);
+  
+  return {
+    utterances: allUtterances,
+    chunks: processedChunks
+  };
 }; 
