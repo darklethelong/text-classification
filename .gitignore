@@ -36,3 +36,7 @@ docker-volumes/
 
 # Jupyter notebook checkpoints
 .ipynb_checkpoints/
+
+# UI dependencies
+ui/node_modules/
+frontend/node_modules/
