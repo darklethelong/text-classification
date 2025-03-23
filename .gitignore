@@ -42,6 +42,9 @@ venv.bak/
 .settings/
 *.sublime-workspace
 *.sublime-project
+.spyderproject
+.spyproject
+.ropeproject
 
 # Logs
 logs/
@@ -54,6 +57,13 @@ yarn-error.log*
 outputs/**/*.pt
 outputs/
 model.pt
+*.h5
+*.ckpt
+*.pth
+*.hdf5
+outputs/models_*/*.pt
+outputs/**/*.pt
+outputs/**/*.pth
 
 # Local development settings
 .env.local
@@ -80,4 +90,5 @@ frontend/ui/node_modules/
 ui/.cache/
 frontend/.cache/
 frontend/ui/.cache/
-**/.cache/**
+frontend/ui/node_modules/.cache/
+**/*.pack
