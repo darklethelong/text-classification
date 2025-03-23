@@ -1,0 +1,38 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Virtual environments
+venv/
+env/
+.env
+.venv/
+
+# IDEs and editors
+.idea/
+.vscode/
+.cursor/
+*.swp
+*.swo
+
+# Logs
+logs/
+*.log
+
+# Model outputs and weights (can be large files)
+outputs/**/*.pt
+
+# Local development settings
+.env.local
+
+# Docker volumes
+docker-volumes/
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/

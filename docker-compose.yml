@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  complaint-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: complaint-detection-api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the model directory to avoid copying large files during build
+      - ./outputs/models_20250321_222124:/app/output/models_20250321_222124:ro
+    environment:
+      - MODEL_PATH=/app/output/models_20250321_222124/lstm_cnn_roberta_full.pt
+      - MODEL_VOCAB_PATH=/app/output/models_20250321_222124/lstm_cnn_roberta_full_vocab.json
+      # Add timezone for consistent logging
+      - TZ=UTC
+    restart: unless-stopped
+    # Set resource limits to prevent container from using too much memory
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+    # Add health check to ensure the API is actually running
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s 
